@@ -1,0 +1,266 @@
+/* frontend/src/style/LoginPage.css */
+
+:root {
+    /* Colores originales de tu diseño */
+    --color-primario: #005A5B; 
+    --color-acento: #007BFF;
+    --color-acento-hover: #0056b3;
+    --color-texto-claro: #FFFFFF;
+    --color-fondo-tarjeta: #FFFFFF;
+    --color-texto-oscuro: #212529; 
+    --color-texto-secundario: #6c757d; 
+    --color-borde: #dee2e6;
+    --color-error: #D32F2F;
+
+    /* Colores solo para los iconos de selección */
+    --icon-sst: #005A5B; 
+    --icon-calidad: #20c997;
+    --icon-collab: #007BFF;
+}
+
+/* =========================================
+   VISTA DE SELECCIÓN DE ROL (NUEVA)
+   ========================================= */
+.login-container-selection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+    background-color: #f4f7f6;
+    padding: 2rem;
+}
+
+.login-header-center {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+/* Logo en la pantalla de selección */
+/* Logo en la pantalla de selección */
+.login-logo-selection {
+    width: 280px;       /* Aumentado de 180px a 280px (Más grande) */
+    height: auto;
+    margin-bottom: 0rem;
+    margin-top: -5rem;   /* Agregado para bajarlo un poco */
+}
+.login-header-center h1 { font-size: 2.5rem; color: var(--color-primario); margin: 0; }
+.login-header-center p { font-size: 1.2rem; color: #666; margin: 0.5rem 0 2rem 0; }
+.login-header-center h3 { font-weight: 400; color: #444; }
+
+.role-cards-container {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 1000px;
+}
+
+.role-card {
+    background: white;
+    width: 240px;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.role-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+    border-color: #ddd;
+}
+
+.role-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+.sst-color { color: var(--icon-sst); }
+.calidad-color { color: var(--icon-calidad); }
+.collab-color { color: var(--icon-collab); }
+
+.role-card h3 { margin: 0 0 0.5rem 0; color: #333; }
+.role-card p { margin: 0; color: #777; font-size: 0.9rem; }
+
+.login-footer-info {
+    margin-top: 4rem;
+    color: #999;
+}
+
+/* =========================================
+   VISTA DE FORMULARIO (LOGIN ORIGINAL RESTAURADO)
+   ========================================= */
+.login-container {
+    display: flex;
+    width: 900px;
+    min-height: 550px;
+    background-color: var(--color-fondo-tarjeta);
+    box-shadow: var(--shadow-md);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative; /* Para el botón volver */
+}
+
+/* Botón Volver */
+.btn-back {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    transition: color 0.2s;
+    z-index: 10;
+}
+.btn-back:hover { color: #000; }
+
+/* Columna Izquierda (Visual) */
+.login-visual-column {
+    flex: 1;
+    background-color: var(--color-primario); /* SIEMPRE VERDE CORPORATIVO */
+    color: var(--color-texto-claro);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: left;
+    padding: 3rem;
+}
+
+.visual-content { max-width: 300px; }
+.visual-content h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    border-bottom: 3px solid var(--color-acento);
+    padding-bottom: 0.5rem;
+    display: inline-block;
+}
+.visual-content p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    line-height: 1.6;
+}
+
+/* Columna Derecha (Formulario) */
+.login-form-column {
+    flex: 1;
+    background-color: var(--color-fondo-tarjeta);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem;
+}
+
+.login-form-wrapper {
+    width: 100%;
+    max-width: 350px;
+}
+
+/* Logo dentro del formulario */
+.login-form-logo {
+    width: 150px; /* Aumentado de 150px a 200px */
+    height: auto;
+    display: block;
+    margin: 0 auto; 
+    margin-top: -3rem;
+    margin-bottom: 0rem;
+}
+
+.login-logo-placeholder {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-primario);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.login-form-wrapper h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--color-texto-oscuro);
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+/* Inputs */
+.input-group {
+    margin-bottom: 1.5rem;
+}
+.input-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-texto-secundario);
+    margin-bottom: 0.5rem;
+}
+
+.input-with-icon {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--border-radius);
+    padding: 0 0.75rem;
+    transition: border-color 0.3s ease;
+}
+.input-with-icon:focus-within {
+    border-color: var(--color-acento);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.input-icon {
+    margin-right: 0.75rem;
+    color: var(--color-texto-secundario);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.input-with-icon input {
+    width: 100%;
+    border: none;
+    outline: none;
+    padding: 0.9rem 0;
+    font-size: 1rem;
+    background-color: transparent;
+    color: var(--color-texto-oscuro);
+}
+
+.login-error-message {
+    color: var(--color-error);
+    font-size: 0.9rem;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.login-button {
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .login-container {
+        flex-direction: column;
+        width: 100vw;
+        min-height: 100vh;
+        height: auto;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .login-visual-column {
+        min-height: 250px;
+        flex-basis: 250px; 
+    }
+    .login-form-column {
+        flex: 1;
+        padding: 2rem;
+        align-items: flex-start;
+    }
+}

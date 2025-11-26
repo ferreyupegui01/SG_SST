@@ -1,0 +1,474 @@
+/* frontend/src/index.css (Global y Responsive) */
+@import 'sweetalert2/dist/sweetalert2.min.css';
+
+/* --- 1. VARIABLES DE DISEÑO (TEMA PROFESIONAL) --- */
+:root {
+    /* Paleta de Colores */
+    --color-primario: #005A5B; /* Verde Oscuro (Teal) */
+    --color-primario-hover: #004B4C;
+    --color-acento: #007BFF; /* Azul Acento */
+    --color-acento-hover: #0056b3;
+    --color-danger: #f37683; /* Rojo */
+    --color-danger-hover: #c82333;
+    --color-warning: #f1ce63; /* Amarillo */
+    --color-warning-hover: #e0a800;
+    --color-secondary: #6c757d; /* Gris */
+    --color-secondary-hover: #5a6268;
+    --color-success: #28a745; /* Verde 'OK' */
+    --color-success-hover: #218838;
+    
+
+    /* Paleta de UI */
+    --color-bg: #f4f7f6; /* Fondo de página */
+    --color-card: #ffffff;
+    --color-text: #212529;
+    --color-text-secondary: #6c757d;
+    --color-border: #dee2e6;
+
+    /* Sombras y Bordes */
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+    --border-radius: 8px;
+}
+
+/* --- 2. RESET Y ESTILOS BASE (PARA CENTRAR EL LOGIN) --- */
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--color-bg); 
+    color: var(--color-text);
+}
+body, #root {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center; /* Centra horizontalmente */
+    align-items: center;    /* Centra verticalmente */
+    box-sizing: border-box;
+}
+#root.layout-activo {
+    display: block; /* Desactiva el centrado cuando estás logueado */
+    min-height: 100vh;
+}
+
+/* --- 3. ESTILOS DE LAYOUT DE PÁGINA REUTILIZABLES --- */
+.page-container {
+    width: 100%;
+}
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap; 
+    gap: 1rem; 
+}
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+}
+.page-content-card {
+    background-color: var(--color-card);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-border);
+    /* Agregado sutil para evitar desbordes, pero sin cambiar tu diseño */
+    overflow: hidden; 
+    max-width: 100%;
+}
+
+/* --- 4. CLASES DE BOTONES GLOBALES --- */
+.btn {
+    padding: 0.75rem 1.25rem;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex; 
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem; 
+    white-space: nowrap;
+}
+.btn:disabled {
+    background-color: #aaa;
+    color: #eee;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.btn-primary { background-color: var(--color-acento); color: white; }
+.btn-primary:hover:not(:disabled) { background-color: var(--color-acento-hover); }
+.btn-secondary { background-color: var(--color-secondary); color: white; }
+.btn-secondary:hover:not(:disabled) { background-color: var(--color-secondary-hover); }
+.btn-danger { background-color: var(--color-danger); color: white; }
+.btn-danger:hover:not(:disabled) { background-color: var(--color-danger-hover); }
+.btn-warning { background-color: var(--color-warning); color: var(--color-text); }
+.btn-warning:hover:not(:disabled) { background-color: var(--color-warning-hover); }
+.btn-success { background-color: var(--color-success); color: white; }
+.btn-success:hover:not(:disabled) { background-color: var(--color-success-hover); }
+.btn-icon {
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-secondary);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+.btn-icon:hover { background-color: #f8f9fa; }
+.btn-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* --- 5. ESTILOS DE FORMULARIO GLOBALES --- */
+.form-group { margin-bottom: 1.5rem; }
+.form-group label { display: block; font-size: 0.9rem; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 0.5rem; }
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group input[type="file"],
+.form-group select,
+.form-group textarea {
+    width: 100%; padding: 0.8rem; font-size: 1rem; border: 1px solid var(--color-border);
+    border-radius: var(--border-radius); box-sizing: border-box; font-family: inherit; background-color: #fff;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--color-acento); box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+.form-group textarea { resize: vertical; min-height: 80px; }
+
+/* --- 6. ESTILOS DE TABLA GLOBALES Y RESPONSIVE --- */
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto; /* Permite scroll horizontal */
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse; 
+    min-width: 900px; /* Ancho mínimo para forzar el scroll */
+}
+.data-table th, .data-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+.data-table th {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    background-color: #f8f9fa;
+}
+.data-table td {
+    font-size: 0.95rem;
+    color: var(--color-text);
+}
+.data-table tr:hover {
+    background-color: #f8f9fa;
+}
+.action-buttons {
+    white-space: nowrap;
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* --- 7. PÍLDORAS DE ESTADO GLOBALES --- */
+.status-pill { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.status-activo { background-color: #e6f7ec; color: #005A5B; }
+.status-pendiente { background-color: #fff8e1; color: #f57f17; }
+.status-inactivo { background-color: #fbebee; color: #dc3545; }
+.status-proceso { background-color: #e7f3ff; color: #007BFF; }
+
+/* --- 8. MENSAJES GLOBALES --- */
+.error-message { color: var(--color-danger); font-weight: 500; text-align: center; }
+.success-message { color: var(--color-success); font-weight: 600; text-align: center; background-color: #e6f7ec; padding: 1rem; border-radius: var(--border-radius); }
+
+/* --- 9. RESPONSIVIDAD GLOBAL --- */
+@media (max-width: 768px) {
+    body, #root {
+        align-items: flex-start; 
+    }
+    .page-header { flex-direction: column; align-items: flex-start; }
+    .page-content-card { padding: 1rem; }
+    .action-buttons { flex-direction: column; width: 120px; }
+}
+
+/* ==========================================================================
+   10. NUEVOS ESTILOS PARA FILTROS (Diseño limpio y corregido)
+   ========================================================================== */
+
+/* Contenedor de la barra de filtros */
+.filters-bar {
+    background-color: #ffffff;
+    padding: 1rem; /* Padding original cómodo */
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    border: 1px solid #eff2f5;
+    
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    
+    /* ESTA es la clave para que no se monten: permitir salto de línea */
+    flex-wrap: wrap; 
+}
+
+/* Contenedor del Input de Búsqueda */
+.search-input-container {
+    position: relative;
+    /* Flex grow + Flex basis para que ocupe espacio pero tenga un mínimo sano */
+    flex: 2 1 300px; 
+    min-width: 250px; /* Evita que se aplaste demasiado */
+}
+
+/* Icono de Lupa */
+.search-input-container svg {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #98a2b3;
+    font-size: 1rem;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Input de Texto (Estilo Píldora) */
+.search-input-container input.form-control {
+    width: 100%;
+    height: 46px; /* Altura fija para alinear */
+    padding-left: 42px !important; /* Espacio para la lupa */
+    border-radius: 50px; /* Redondeado completo */
+    border: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+    font-size: 0.95rem;
+    box-shadow: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box; /* Asegura que no se desborde */
+}
+
+/* Efecto Focus */
+.search-input-container input.form-control:focus {
+    background-color: #ffffff;
+    border-color: var(--color-acento);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+/* Contenedor del Selector */
+.filter-select-container {
+    /* Ocupa menos espacio que el buscador, pero tiene un ancho base */
+    flex: 1 1 200px; 
+    min-width: 200px;
+}
+
+/* Selector (Dropdown) */
+.filter-select-container select.form-control {
+    width: 100%;
+    height: 46px; /* Misma altura que el buscador */
+    border-radius: 10px; /* Bordes un poco menos redondos */
+    border: 1px solid #e0e0e0;
+    background-color: #ffffff;
+    padding-left: 1rem;
+    cursor: pointer;
+    color: var(--color-text);
+    font-weight: 500;
+    box-sizing: border-box;
+}
+
+.filter-select-container select.form-control:focus {
+    border-color: var(--color-acento);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+    outline: none;
+}
+
+
+
+/* Ajuste Responsive (Celulares) */
+@media (max-width: 768px) {
+    .filters-bar {
+        flex-direction: column;
+        align-items: stretch; /* Estira al ancho completo */
+        gap: 1rem;
+    }
+    
+    .search-input-container, 
+    .filter-select-container {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 100%;
+    }
+}
+/* --- ESTILOS DEL GESTOR DE FORMULARIOS (PANEL DIVIDIDO) --- */
+
+/* Contenedor Principal del Panel */
+.split-layout-container {
+    display: flex;
+    gap: 1.5rem;
+    height: calc(100vh - 140px); /* Resta el header principal */
+    overflow: hidden; /* Evita scroll en la página entera */
+}
+
+/* --- PANEL IZQUIERDO (LISTA) --- */
+.split-sidebar {
+    width: 320px;
+    min-width: 300px;
+    background-color: #fff;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-search-box {
+    padding: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.form-item {
+    padding: 1rem;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.form-item:hover {
+    background-color: #f8f9fa;
+    border-color: #eee;
+}
+
+.form-item.active {
+    background-color: #f0f7ff; /* Azul muy claro */
+    border-color: #cce5ff;
+    position: relative;
+}
+.form-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10%;
+    height: 80%;
+    width: 4px;
+    background-color: var(--color-acento); /* Azul */
+    border-radius: 0 4px 4px 0;
+}
+
+.form-item-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+    font-size: 0.95rem;
+}
+.form-item-subtitle {
+    font-size: 0.8rem;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* --- PANEL DERECHO (EDITOR) --- */
+.split-content {
+    flex: 1;
+    background-color: #fff;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Importante para scrolls internos */
+}
+
+/* Cabecera del Formulario */
+.editor-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* Cuerpo con Preguntas */
+.editor-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    background-color: #fcfcfc;
+}
+
+/* Tarjeta de Pregunta */
+.question-block {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    transition: transform 0.2s;
+}
+.question-block:hover {
+    border-color: #b0c4de;
+    transform: translateX(2px);
+}
+
+.q-number {
+    background-color: #e9ecef;
+    color: #495057;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.q-text {
+    flex: 1;
+    font-size: 1rem;
+    color: #333;
+}
+
+/* Footer para agregar */
+.editor-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    background-color: #fff;
+}
+
+/* Estado Vacío */
+.empty-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    text-align: center;
+}
+.empty-placeholder svg {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: #dee2e6;
+}

@@ -1,0 +1,69 @@
+/* frontend/src/style/PlanificacionPage.css */
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Estilo para el filtro (selector de cronograma) */
+.cronograma-selector {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    background-color: var(--color-card); /* Usa variable global */
+    padding: 1rem;
+    border-radius: var(--border-radius); /* Usa variable global */
+    box-shadow: var(--shadow-sm); /* Usa variable global */
+}
+
+.cronograma-selector label {
+    font-weight: 600;
+    color: var(--color-text); /* Usa variable global */
+}
+
+.cronograma-selector select {
+    font-size: 1rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: var(--border-radius); /* Usa variable global */
+    border: 1px solid var(--color-border); /* Usa variable global */
+    min-width: 300px;
+}
+
+.cronograma-descripcion {
+    font-size: 0.95rem;
+    color: var(--color-text-secondary); /* Usa variable global */
+    margin: -1rem 0 1.5rem 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #f8f9fa; /* Gris muy claro */
+    border-radius: var(--border-radius); /* Usa variable global */
+    border: 1px solid var(--color-border); /* Usa variable global */
+}
+
+/* --- Tarjeta del Calendario --- */
+.calendar-card {
+    margin-top: 2rem;
+    padding: 1.5rem;
+}
+
+/* --- Estilos para React Big Calendar --- */
+.rbc-calendar {
+    height: 600px !important;
+}
+.rbc-event {
+    background-color: var(--color-primario); /* Usa variable global */
+    border: 1px solid var(--color-primario-hover); /* Usa variable global */
+}
+.rbc-event:focus, .rbc-event.rbc-selected {
+    background-color: var(--color-acento); /* Usa variable global */
+}
+.rbc-header {
+    background-color: #f8f9fa;
+    color: var(--color-text-secondary); /* Usa variable global */
+    font-weight: 600;
+    border-bottom: 2px solid var(--color-border); /* Usa variable global */
+    padding: 0.75rem 0;
+}
+.rbc-today {
+    background-color: #e6f7ec; /* Verde claro (global) */
+}

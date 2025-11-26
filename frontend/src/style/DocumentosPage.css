@@ -1,0 +1,200 @@
+/* frontend/src/style/DocumentosPage.css */
+
+/* --- Barra de Herramientas (CORREGIDA) --- */
+.docs-toolbar {
+    display: flex;
+    justify-content: space-between; /* Separa extremos */
+    align-items: center; /* Centra verticalmente */
+    margin-bottom: 1.5rem;
+    background-color: #fff;
+    padding: 0.8rem 1.2rem; /* Padding ajustado */
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+    gap: 1rem;
+}
+
+/* --- Breadcrumbs Estilo Cápsula --- */
+.document-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    flex-wrap: wrap; /* Permite bajar si hay muchas carpetas */
+    flex: 1; /* Ocupa el espacio disponible a la izquierda */
+}
+
+.breadcrumb-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 20px;
+    transition: background 0.2s, color 0.2s;
+    background-color: transparent;
+}
+
+.breadcrumb-item:hover {
+    background-color: #f1f3f5;
+    color: var(--color-acento);
+}
+
+.breadcrumb-item.active {
+    background-color: #e7f1ff;
+    color: var(--color-acento);
+    font-weight: 600;
+    cursor: default;
+}
+
+.breadcrumb-separator {
+    color: #adb5bd;
+    font-size: 0.7rem;
+}
+
+/* --- Buscador Local (CORREGIDO) --- */
+.docs-search {
+    position: relative;
+    width: 300px; /* Ancho fijo para que no se encoja */
+    flex-shrink: 0; /* Evita que se aplaste */
+}
+
+.docs-search input {
+    width: 100%;
+    padding: 10px 15px 10px 40px; /* Espacio para el icono */
+    border-radius: 50px;
+    border: 1px solid #dee2e6;
+    font-size: 0.9rem;
+    background-color: #f8f9fa;
+    transition: all 0.2s;
+    box-sizing: border-box; /* Importante para el padding */
+}
+
+.docs-search input:focus {
+    background-color: #fff;
+    border-color: var(--color-acento);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+    outline: none;
+}
+
+.docs-search svg {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 1rem;
+}
+
+/* --- Lista de Documentos --- */
+.document-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.document-list-header {
+    display: grid;
+    grid-template-columns: 50px 3fr 1fr 1fr 100px;
+    padding: 0 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.document-row {
+    display: grid;
+    grid-template-columns: 50px 3fr 1fr 1fr 100px;
+    align-items: center;
+    background-color: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.8rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.document-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    border-color: var(--color-acento);
+    z-index: 2;
+}
+
+.doc-icon-wrapper {
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.doc-info-main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.doc-name {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-text);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.doc-name:hover {
+    color: var(--color-acento);
+    text-decoration: underline;
+}
+
+.doc-meta-mobile { display: none; }
+
+.doc-date, .doc-size {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+.doc-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* --- Estado Vacío --- */
+.empty-state-docs {
+    text-align: center;
+    padding: 3rem;
+    color: #adb5bd;
+    background: #fff;
+    border-radius: 12px;
+    border: 2px dashed #dee2e6;
+}
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .docs-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .docs-search { width: 100%; }
+    
+    .document-list-header { display: none; }
+    
+    .document-row {
+        grid-template-columns: 40px 1fr 50px; /* Icono | Info | Actions */
+        padding: 1rem;
+    }
+    
+    .doc-date, .doc-size { display: none; }
+    .doc-meta-mobile { 
+        display: block; 
+        font-size: 0.75rem; 
+        color: #888; 
+        margin-top: 2px; 
+    }
+}

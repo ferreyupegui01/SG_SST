@@ -1,0 +1,54 @@
+/* frontend/src/style/DashboardColaborador.css */
+
+.dashboard-colaborador-header {
+    margin-bottom: 2rem;
+}
+.dashboard-colaborador-header h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #212529;
+    margin: 0;
+}
+
+.report-cards-container {
+    display: grid;
+    /* Dos columnas de igual tamaño */
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.report-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    text-decoration: none;
+    color: #212529;
+    transition: all 0.3s ease;
+    border: 1px solid #dee2e6;
+}
+.report-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    border-color: #005A5B; /* Verde corporativo */
+}
+
+.report-card h2 {
+    font-size: 1.5rem;
+    color: #005A5B; /* Verde corporativo */
+    margin: 0 0 0.5rem 0;
+}
+.report-card p {
+    font-size: 0.95rem;
+    color: #6c757d;
+    margin: 0;
+}
+
+/* Estilos para la tabla de historial */
+.historial-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 1.5rem;
+}

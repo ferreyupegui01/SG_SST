@@ -1,0 +1,153 @@
+/* frontend/src/style/InspeccionesPage.css (Completo) */
+
+.inspection-library {
+    margin-bottom: 2rem;
+}
+
+.inspection-library h2 {
+    margin-top: 0;
+}
+
+.form-buttons-container {
+    display: flex;
+    flex-wrap: wrap; 
+    gap: 1rem; 
+}
+
+/* --- Estilos para Modal Ver Detalle --- */
+.modal-lg {
+    max-width: 800px; 
+}
+
+.inspection-details .detail-section {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: #333;
+}
+.inspection-details .detail-section strong {
+    color: var(--color-primario); 
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    text-decoration: none; /* Quita subrayado */
+}
+
+.detail-box {
+    background-color: #f8f9fa;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    margin-top: 0.25rem;
+    white-space: pre-wrap;
+}
+
+/* ... (json-viewer styles sin cambios) ... */
+
+/* --- Estilos para Secciones de Checklist --- */
+.form-section-header {
+    background-color: #f4f7f6;
+    padding: 0.75rem 1rem;
+    margin: 1.5rem 0 0.5rem 0;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-primario);
+}
+
+/* --- Estilos de Checklist (NUEVA ESTRUCTURA) --- */
+.form-checklist-container {
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+}
+
+.checklist-item-wrapper {
+    padding: 1rem 0.5rem;
+    border-bottom: 1px solid #f0f2f5;
+}
+.checklist-item-wrapper:last-of-type {
+    border-bottom: none;
+}
+
+.checklist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.checklist-item .item-label {
+    font-size: 0.95rem;
+    color: var(--color-text);
+    margin-right: 1rem;
+    flex: 1; 
+}
+
+.checklist-options {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* (Estilos de botones de radio B/R/M/C/NC - sin cambios) */
+.radio-label input[type="radio"],
+.radio-label-cn input[type="radio"] {
+    display: none; 
+}
+.radio-label span, 
+.radio-label-cn span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    width: 40px;
+    height: 30px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #fff;
+    color: var(--color-text);
+}
+.radio-label-cn span { width: 45px; }
+
+/* (Colores de selección - sin cambios) */
+.radio-label input[value="B"]:checked + span,
+.radio-label-cn input[value="C"]:checked + span {
+    background-color: var(--color-success); color: white; border-color: var(--color-success);
+}
+.radio-label input[value="R"]:checked + span { 
+    background-color: var(--color-warning); color: var(--color-text); border-color: var(--color-warning); 
+}
+.radio-label input[value="M"]:checked + span,
+.radio-label-cn input[value="NC"]:checked + span { 
+    background-color: var(--color-danger); color: white; border-color: var(--color-danger); 
+}
+.radio-label input[value="NA"]:checked + span { 
+    background-color: var(--color-secondary); color: white; border-color: var(--color-secondary); 
+}
+
+/* --- NUEVO: Estilo para la observación por ítem --- */
+.checklist-item-observacion {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.checklist-item-observacion label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+}
+.checklist-item-observacion input {
+    flex: 1;
+    width: 100%;
+    padding: 0.5rem; /* Más pequeño */
+    font-size: 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-sizing: border-box;
+}

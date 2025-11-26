@@ -1,0 +1,163 @@
+/* frontend/src/style/Modal.css */
+
+/* --- El fondo oscuro (Overlay) --- */
+.modal-overlay {
+    position: fixed; /* Cubre toda la pantalla */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.6); /* Negro semitransparente */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Asegura que esté por encima de todo */
+}
+
+/* --- La caja blanca (Modal) --- */
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 500px; /* Ancho estándar para un formulario */
+    z-index: 1001;
+    
+    /* Animación de entrada */
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Encabezado del Modal --- */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #212529;
+}
+
+.modal-close-button {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #888;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+.modal-close-button:hover {
+    color: #000;
+}
+
+/* --- Cuerpo y Formulario del Modal --- */
+.modal-body {
+    /* (Estilos de formulario) */
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-sizing: border-box; 
+    font-family: inherit;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.modal-error {
+    color: #D32F2F;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* --- Pie del Modal (Botones) --- */
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem; /* Espacio entre botones */
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+}
+
+/* --- Estilos para Lista de Evidencias (NUEVO) --- */
+.evidence-list {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+.evidence-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+.evidence-item:last-child {
+    border-bottom: none;
+}
+
+.evidence-item span {
+    margin-right: 0.5rem;
+    font-size: 1.5rem;
+}
+
+.evidence-info {
+    font-size: 0.9rem;
+}
+
+.evidence-info a {
+    font-weight: 600;
+    color: #007BFF;
+    text-decoration: none;
+}
+.evidence-info a:hover {
+    text-decoration: underline;
+}
+
+.evidence-info small {
+    display: block;
+    color: #6c757d;
+}

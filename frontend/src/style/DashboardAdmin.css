@@ -1,0 +1,140 @@
+/* frontend/src/style/DashboardAdmin.css */
+
+.dashboard-admin-header {
+    margin-bottom: 2rem;
+}
+.dashboard-admin-header h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #212529;
+    margin: 0;
+}
+.dashboard-admin-header p {
+    font-size: 1.1rem;
+    color: #6c757d;
+    margin: 0.25rem 0 0 0;
+}
+
+/* --- Contenedor de Widgets KPIs --- */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+/* --- TARJETA KPI (AHORA ES UN ENLACE) --- */
+.kpi-card-link {
+    text-decoration: none; /* Quita el subrayado del enlace */
+}
+
+.kpi-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+    border: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+/* Efecto hover en la tarjeta */
+.kpi-card-link:hover .kpi-card {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    border-color: #007BFF; /* Azul acento */
+}
+
+.kpi-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6c757d; 
+    text-transform: uppercase;
+    margin: 0 0 0.5rem 0;
+}
+
+.kpi-card .kpi-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #005A5B; 
+}
+/* Colores específicos para valores */
+.kpi-card.kpi-inspecciones .kpi-value { color: #007BFF; }
+.kpi-card.kpi-reportes-maq .kpi-value { color: #f57f17; }
+.kpi-card.kpi-reportes-seg .kpi-value { color: #dc3545; }
+.kpi-card.kpi-acpm .kpi-value { color: #005A5B; }
+
+
+/* --- Cuadrícula de Listas (2 columnas) --- */
+.dashboard-lists-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 columnas */
+    gap: 2rem;
+}
+
+.dashboard-list-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid #dee2e6;
+    padding: 1.5rem;
+}
+
+/* --- TÍTULO DE LA LISTA (AHORA ES UN ENLACE) --- */
+.dashboard-list-card h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 1rem 0;
+    border-bottom: 2px solid #f4f7f6;
+    padding-bottom: 0.75rem;
+}
+.dashboard-list-card h2 a {
+    text-decoration: none;
+    color: #212529; /* Color de texto normal */
+    transition: color 0.2s ease;
+}
+.dashboard-list-card h2 a:hover {
+    color: #007BFF; /* Se pone azul al pasar el mouse */
+}
+/* --- FIN DEL CAMBIO DE ENLACE --- */
+
+
+.dashboard-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0.25rem;
+    border-bottom: 1px solid #f0f2f5;
+    font-size: 0.95rem;
+}
+.dashboard-list-item:last-child {
+    border-bottom: none;
+}
+
+.dashboard-list-item .item-info {
+    font-weight: 500;
+    color: #333;
+}
+.dashboard-list-item .item-date {
+    font-weight: 600;
+    color: #dc3545; /* Rojo para fechas límite */
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+.dashboard-list-item .item-type {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* Responsividad */
+@media (max-width: 992px) {
+    .kpi-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .dashboard-lists-grid {
+        grid-template-columns: 1fr; 
+    }
+}
+@media (max-width: 576px) {
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}

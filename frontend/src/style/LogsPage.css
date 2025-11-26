@@ -1,0 +1,59 @@
+/* frontend/src/style/LogsPage.css */
+
+/* Tarjeta contenedora de los filtros */
+.logs-filter-card {
+    margin-bottom: 2rem;
+    padding: 1.5rem 2rem;
+}
+
+/* La barra de filtros (usa flexbox para responsiveness) */
+.logs-filter-bar {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los filtros se apilen en móvil */
+    gap: 1.5rem; /* Espacio entre los filtros */
+    align-items: flex-start; /* Alinea los items al inicio */
+}
+
+/* Cada item del filtro (cada <select> o <input>) */
+.filter-item {
+    flex: 1; /* Ocupa el espacio disponible */
+    min-width: 180px; /* Ancho mínimo antes de apilarse */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hereda el estilo global de .form-group label */
+.filter-item label {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+/* Hereda el estilo global de inputs/selects */
+.filter-item select,
+.filter-item input[type="date"] {
+    width: 100%;
+}
+
+/* Contenedor de botones */
+.filter-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-self: flex-end; /* Alinea los botones abajo (al final de la label) */
+    flex-shrink: 0; /* Evita que los botones se encojan */
+}
+
+/* En pantallas más pequeñas, los botones ocupan todo el ancho */
+@media (max-width: 768px) {
+    .filter-buttons {
+        width: 100%;
+        /* Opcional: estira los botones */
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .filter-item {
+        min-width: 100%; /* Ocupa todo el ancho en móvil */
+    }
+}

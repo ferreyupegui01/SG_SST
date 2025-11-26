@@ -1,0 +1,155 @@
+/* frontend/src/style/Sidebar.css (Responsive y con Logo) */
+
+:root {
+    --sidebar-width: 260px;
+}
+
+.sidebar-container {
+    display: flex;
+    flex-direction: column;
+    width: var(--sidebar-width);
+    height: 100vh;
+    background-color: var(--color-primario);
+    color: var(--color-texto-claro);
+    position: fixed; 
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    transition: left 0.3s ease; 
+}
+
+/* --- 1. SECCIÓN DEL LOGO (INTACTA) --- */
+.sidebar-logo {
+    display: flex;
+    flex-direction: column; 
+    align-items: center;  
+    justify-content: center; /* Centra el contenido */ 
+    border-bottom: 1px solid var(--color-primario-hover);
+    position: relative; 
+}
+
+/* CORRECCIÓN: Clase para la imagen (Mantenemos tus ajustes exactos) */
+.sidebar-logo-img {
+    width: 150px; /* Ancho que especificaste */
+    height: auto; 
+    margin-top: -2rem;
+    /* CORRECCIÓN: Espacio mínimo entre logo y texto */
+    margin-bottom: -2.5rem; /* Pega el texto al logo */
+}
+
+.sidebar-logo h3 {
+    margin: 0; /* Sin margen */
+    font-size: 1.25rem; 
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Botón de cerrar (solo para móvil) */
+.sidebar-close-btn {
+    display: none; 
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+}
+/* --- FIN DE LA CORRECCIÓN --- */
+
+
+/* --- Navegación --- */
+.sidebar-nav {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-top: 1rem;
+}
+
+/* --- NUEVO: Estilo para los títulos de sección (Super Admin / Calidad) --- */
+.sidebar-section-label {
+    padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.4); /* Blanco semitransparente */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; 
+    padding: 1rem 1.5rem;
+    color: var(--color-texto-claro);
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    border-left: 4px solid transparent; 
+}
+
+.sidebar-link svg {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.sidebar-link:hover {
+    background-color: var(--color-primario-hover);
+}
+
+.sidebar-link.active {
+    background-color: var(--color-fondo-oscuro, #003838);
+    border-left-color: var(--color-acento); 
+    font-weight: 600;
+}
+.sidebar-link.active svg {
+    opacity: 1;
+}
+
+/* --- Footer --- */
+.sidebar-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--color-primario-hover);
+}
+
+/* frontend/src/style/Sidebar.css */
+
+
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto; /* Permite hacer scroll si no cabe */
+    padding: 1rem 0;
+    
+    /* --- ESTO OCULTA LA BARRA VISUALMENTE --- */
+    
+    /* Para Firefox */
+    scrollbar-width: none; 
+    
+    /* Para Internet Explorer y Edge antiguo */
+    -ms-overflow-style: none;  
+}
+
+/* Para Chrome, Safari y Edge moderno */
+.sidebar-nav::-webkit-scrollbar {
+    display: none;
+}
+
+
+/* --- RESPONSIVIDAD (Tablet y Móvil) --- */
+@media (max-width: 992px) {
+    .sidebar-container {
+        left: calc(var(--sidebar-width) * -1); 
+        z-index: 2000; 
+    }
+    
+    .sidebar-container.open {
+        left: 0; 
+    }
+
+    .sidebar-close-btn {
+        display: block; 
+    }
+}

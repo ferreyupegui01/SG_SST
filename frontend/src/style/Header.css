@@ -1,0 +1,72 @@
+/* frontend/src/style/Header.css */
+
+.header-container {
+    display: flex;
+    justify-content: flex-end; /* Alinea todo a la derecha */
+    align-items: center;
+    padding: 1rem 2rem;
+    height: 70px; /* Altura fija del header */
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #dee2e6; /* Borde sutil */
+}
+
+.header-user-info {
+    display: flex;
+    align-items: center;
+    color: #6c757d; /* Gris para "Bienvenido" */
+}
+
+.header-user-info .user-name {
+    margin: 0 0.5rem 0 0.25rem;
+    color: #212529; /* Texto oscuro */
+    font-weight: 600;
+}
+
+.header-user-info .user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #007BFF; /* Color acento */
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-left: 0.5rem;
+}
+
+
+
+.header-logout-button {
+    background: transparent;
+    border: 1px solid #dc3545; /* Rojo */
+    color: #dc3545;
+    padding: 0.4rem 0.8rem;
+    margin-left: 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.header-logout-button:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+.sidebar-logo-img3 {
+    width: 160px; /* Ancho que especificaste */
+    height: auto; 
+    margin-top: -2rem;
+    position: absolute;
+    left: 2%;
+    /* CORRECCIÓN: Espacio mínimo entre logo y texto */
+    margin-bottom: -2.5rem; /* Pega el texto al logo */
+}
+
+.nombreEmpresa{
+    position: absolute;
+    left: 13%;
+    /* color: #000; */
+}
