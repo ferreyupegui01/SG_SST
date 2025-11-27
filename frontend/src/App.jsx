@@ -4,7 +4,6 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
-// --- Páginas ---
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage'; 
 import UsuariosPage from './pages/UsuariosPage';
@@ -24,15 +23,15 @@ import ReportarSeguridadPage from './pages/ReportarSeguridadPage.jsx';
 import DashboardSuperAdmin from './pages/DashboardSuperAdmin';
 import DashboardCalidad from './pages/DashboardCalidad';
 import GestionFormulariosPage from './pages/GestionFormulariosPage'; 
+// IMPORTAR LA PÁGINA NUEVA
+import DirectorioExternoPage from './pages/DirectorioExternoPage'; 
 
 import MainLayout from './layout/MainLayout'; 
 import ColaboradorLayout from './layout/ColaboradorLayout.jsx'; 
 import ProtectedRoutes from './components/ProtectedRoutes';
 
-// --- GUARDS CLÁSICOS ---
 const AdminRoutes = () => {
     const { usuario } = useAuth();
-    // Permitir si es Super Admin, SST o Calidad
     const tieneAcceso = usuario.rol === 'Super Admin' || usuario.rol === 'Administrador SST' || usuario.rol === 'Gestion de Calidad';
     return tieneAcceso ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
@@ -86,20 +85,25 @@ function App() {
                         <DashboardPage /> 
                     } />
                     
-                    {/* RUTAS SUPER ADMIN */}
+                    {/* SUPER ADMIN */}
                     <Route path="super-admin" element={<SuperAdminRoutes />}>
                         <Route path="dashboard" element={<DashboardSuperAdmin />} />
                         <Route path="formularios" element={<GestionFormulariosPage />} />
                     </Route>
 
-                    {/* RUTAS CALIDAD */}
+                    {/* CALIDAD */}
                     <Route path="calidad" element={<CalidadRoutes />}>
                         <Route path="dashboard" element={<DashboardCalidad />} />
                     </Route>
 
-                    {/* RUTAS GESTIÓN */}
+                    {/* GESTIÓN */}
                     <Route element={<AdminRoutes />}>
                         <Route path="usuarios" element={<UsuariosPage />} />
+                        
+                        {/* --- RUTA NUEVA --- */}
+                        <Route path="directorio" element={<DirectorioExternoPage />} />
+                        {/* ------------------ */}
+
                         <Route path="activos" element={<ActivosPage />} /> 
                         <Route path="planificacion" element={<PlanificacionPage />} />
                         <Route path="inspecciones" element={<InspeccionesPage />} />
@@ -113,7 +117,7 @@ function App() {
                         <Route path="logs" element={<LogsPage />} />
                     </Route>
 
-                    {/* RUTAS COLABORADOR */}
+                    {/* COLABORADOR */}
                     <Route path="reportar-maquina" element={<ReportarMaquinaPage />} />
                     <Route path="reportar-seguridad" element={<ReportarSeguridadPage />} />
 

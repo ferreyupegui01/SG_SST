@@ -218,5 +218,5 @@ export default {
     eliminarPaso,
     descargarArchivo, 
     getDocumentosGenerados,
-    reemplazarEvidencia // <--- Exportar
+    reemplazarEvidencia 
 };

@@ -11,20 +11,18 @@ import {
     BsExclamationTriangleFill, BsGraphUpArrow, BsHouseFill, BsCpuFill, 
     BsShieldFillExclamation, BsFillFolderFill, BsHeartPulseFill, BsArchiveFill, 
     BsFileEarmarkTextFill, BsShieldLockFill, BsJournalCheck, BsListCheck, 
-    BsBarChartFill, BsConeStriped, BsEnvelopeExclamation
+    BsBarChartFill, BsConeStriped, BsEnvelopeExclamation, BsJournalRichtext
 } from 'react-icons/bs';
 
 const Sidebar = ({ isOpen, onClose }) => {
     const { usuario } = useAuth(); 
     const containerClass = `sidebar-container ${isOpen ? 'open' : ''}`;
 
-    // Lógica Clásica de Roles
     const isSuperAdmin = usuario?.rol === 'Super Admin';
     const isAdminSST = usuario?.rol === 'Administrador SST';
     const isCalidad = usuario?.rol === 'Gestion de Calidad';
     const isColaborador = usuario?.rol === 'Colaborador';
 
-    // Helper para roles de gestión (SST o Super Admin)
     const isGestorSST = isAdminSST || isSuperAdmin;
 
     return (
@@ -37,7 +35,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
             <nav className="sidebar-nav">
                 
-                {/* SECCIÓN SUPER ADMIN */}
+                {/* SUPER ADMIN */}
                 {isSuperAdmin && (
                     <>
                         <div className="sidebar-section-label">SUPER ADMIN</div>
@@ -53,7 +51,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                 )}
 
-                {/* SECCIÓN CALIDAD */}
+                {/* CALIDAD */}
                 {isCalidad && (
                     <>
                         <div className="sidebar-section-label">CALIDAD</div>
@@ -63,7 +61,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                 )}
 
-                {/* SECCIÓN GESTIÓN SST (Común para SST y Super Admin) */}
+                {/* GESTIÓN SST */}
                 {isGestorSST && (
                     <>
                         <div className="sidebar-section-label">GESTIÓN SST</div>
@@ -77,6 +75,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <NavLink to="/usuarios" className="sidebar-link" onClick={onClose}>
                             <BsPeopleFill /> Usuarios
                         </NavLink>
+
+                        {/* --- ENLACE NUEVO: DIRECTORIO DE NÓMINA --- */}
+                        <NavLink to="/directorio" className="sidebar-link" onClick={onClose}>
+                            <BsJournalRichtext /> Directorio Nómina
+                        </NavLink>
+                        {/* ------------------------------------------ */}
 
                         <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
                             <BsEnvelopeExclamation /> Solicitudes
@@ -120,7 +124,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                 )}
 
-                {/* SECCIÓN COLABORADOR */}
+                {/* COLABORADOR */}
                 {isColaborador && (
                     <>
                         <div className="sidebar-section-label">COLABORADOR</div>

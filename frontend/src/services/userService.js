@@ -2,6 +2,7 @@
 
 import { apiFetch } from './apiService.js';
 
+// --- CRUD EXISTENTE ---
 export const getColaboradores = async () => {
     return apiFetch('/usuarios');
 };
@@ -14,7 +15,6 @@ export const getUsuarioByCedula = async (cedula) => {
     return apiFetch(`/usuarios/cedula/${cedula}`);
 };
 
-// --- NUEVA FUNCIÓN: Obtener roles ---
 export const getRoles = async () => {
     return apiFetch('/usuarios/roles');
 };
@@ -46,4 +46,10 @@ export const resetPasswordColaborador = async (id, password) => {
         method: 'PATCH',
         body: JSON.stringify({ password }),
     });
+};
+
+// --- NUEVA FUNCIÓN: BUSCAR EN EXTERNO ---
+export const buscarUsuarioExterno = async (query) => {
+    // Llama a tu backend: /api/usuarios/externos/buscar?query=...
+    return apiFetch(`/usuarios/externos/buscar?query=${query}`);
 };

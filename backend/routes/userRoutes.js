@@ -6,6 +6,13 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
+// --- RUTA NUEVA PARA API EXTERNA (ANTES DE LOS IDs) ---
+router.get(
+    '/externos/buscar', 
+    [ protect, admin ], 
+    userController.buscarDirectorioExterno
+);
+
 // POST /api/usuarios (Crear)
 router.post(
     '/',
@@ -33,13 +40,14 @@ router.get(
     userController.getTodosUsuarios
 );
 
-// --- NUEVA RUTA: Obtener Roles ---
+// Obtener Roles
 router.get(
     '/roles',
     [ protect, admin ],
     userController.getRoles
 );
 
+// Obtener por Cédula
 router.get(
     '/cedula/:cedula',
     [ protect, admin ],
