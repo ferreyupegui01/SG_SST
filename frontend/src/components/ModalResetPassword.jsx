@@ -25,7 +25,7 @@ const ModalResetPassword = ({ usuario, alCerrar, alExito }) => {
             // --- REEMPLAZAR 'alert()' ---
             Swal.fire({
                 title: '¡Contraseña Actualizada!',
-                text: `Por favor, informa al colaborador su nueva contraseña temporal: ${password}`,
+                text: `Por favor, informa al colaborador su nueva contraseña: ${password}`,
                 icon: 'success',
                 confirmButtonText: 'Entendido'
             });
@@ -46,9 +46,9 @@ const ModalResetPassword = ({ usuario, alCerrar, alExito }) => {
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
-                        <p>Estás asignando una nueva contraseña temporal para <strong>{usuario.NombreCompleto}</strong>.</p>
+                        <p>Estás asignando una nueva contraseña para <strong>{usuario.NombreCompleto}</strong>.</p>
                         <div className="form-group">
-                            <label htmlFor="password">Nueva Contraseña Temporal *</label>
+                            <label htmlFor="password">Nueva Contraseña *</label>
                             <input type="password" id="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                         </div>
                         {error && <p className="modal-error">{error}</p>}

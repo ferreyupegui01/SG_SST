@@ -23,6 +23,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import indicatorRoutes from './routes/indicatorRoutes.js';
 import pesvRoutes from './routes/pesvRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
+import collabDocsRoutes from './routes/collabDocsRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,6 +58,7 @@ app.use('/api/notificaciones', notificationRoutes);
 app.use('/api/indicadores', indicatorRoutes);
 app.use('/api/pesv', pesvRoutes);
 app.use('/api/solicitudes', requestRoutes);
+app.use('/api/colaboradores-docs', collabDocsRoutes);
 
 initCronJobs();
 

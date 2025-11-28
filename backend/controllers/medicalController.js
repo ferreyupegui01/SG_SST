@@ -5,11 +5,12 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logAction } from '../services/logService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// (getHistorialExamenes - sin cambios)
+// --- OBTENER HISTORIAL ---
 const getHistorialExamenes = async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -21,23 +22,29 @@ const getHistorialExamenes = async (req, res) => {
     }
 };
 
-// (crearExamenMedico - sin cambios)
+// --- CREAR EXAMEN ---
 const crearExamenMedico = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const {
-        idUsuarioColaborador, tipoExamen, fechaExamen, conceptoAptitud,
+        idUsuarioColaborador, nombreColaborador, cedulaColaborador,
+        tipoExamen, fechaExamen, conceptoAptitud,
         recomendacionesGenerales, observaciones, recomendacionesOcupacionales, 
-        medicoEspecialista, entidadEmite, duracionRecomendaciones, resumenCaso, compromisos
+        medicoEspecialista, entidadEmite, resumenCaso, compromisos,
+        // Usamos la fecha en lugar de la duración texto
+        fechaFinRecomendaciones 
     } = req.body;
+    
     const idUsuarioAdminRegistra = req.usuario.id;
 
     try {
         const pool = await poolPromise;
         await pool.request()
-            .input('idUsuarioColaborador', mssql.Int, idUsuarioColaborador)
+            .input('idUsuarioColaborador', mssql.Int, idUsuarioColaborador || null)
             .input('idUsuarioAdminRegistra', mssql.Int, idUsuarioAdminRegistra)
+            .input('nombreColaborador', mssql.NVarChar, nombreColaborador)
+            .input('cedulaColaborador', mssql.NVarChar, cedulaColaborador)
             .input('tipoExamen', mssql.NVarChar, tipoExamen)
             .input('fechaExamen', mssql.Date, fechaExamen)
             .input('conceptoAptitud', mssql.NVarChar, conceptoAptitud)
@@ -46,11 +53,16 @@ const crearExamenMedico = async (req, res) => {
             .input('recomendacionesOcupacionales', mssql.NVarChar, recomendacionesOcupacionales || null)
             .input('medicoEspecialista', mssql.NVarChar, medicoEspecialista || null)
             .input('entidadEmite', mssql.NVarChar, entidadEmite || null)
-            .input('duracionRecomendaciones', mssql.NVarChar, duracionRecomendaciones || null)
             .input('resumenCaso', mssql.NVarChar, resumenCaso || null)
             .input('compromisos', mssql.NVarChar, compromisos || null)
-            .query('EXEC SP_CREATE_ExamenMedico @idUsuarioColaborador, @idUsuarioAdminRegistra, @tipoExamen, @fechaExamen, @conceptoAptitud, @recomendacionesGenerales, @observaciones, @recomendacionesOcupacionales, @medicoEspecialista, @entidadEmite, @duracionRecomendaciones, @resumenCaso, @compromisos');
+            
+            // Enviamos la fecha al SP
+            .input('fechaFinRecomendaciones', mssql.Date, fechaFinRecomendaciones || null)
+            
+            // Nota: Quitamos @duracionRecomendaciones porque ya no existe en la tabla
+            .query('EXEC SP_CREATE_ExamenMedico @idUsuarioColaborador, @idUsuarioAdminRegistra, @tipoExamen, @fechaExamen, @conceptoAptitud, @recomendacionesGenerales, @observaciones, @recomendacionesOcupacionales, @medicoEspecialista, @entidadEmite, @fechaFinRecomendaciones, @resumenCaso, @compromisos, @nombreColaborador, @cedulaColaborador');
 
+        await logAction(req.usuario.id, req.usuario.nombre, 'CREAR_EXAMEN', `Registró examen para: ${nombreColaborador}`);
         res.status(201).json({ msg: 'Examen médico registrado exitosamente' });
     } catch (err) {
         console.error('Error en crearExamenMedico:', err.message);
@@ -58,7 +70,7 @@ const crearExamenMedico = async (req, res) => {
     }
 };
 
-// (getExamenMedicoDetalle - sin cambios)
+// --- OBTENER DETALLE ---
 const getExamenMedicoDetalle = async (req, res) => {
     const { id: idExamenMedico } = req.params;
     try {
@@ -74,7 +86,7 @@ const getExamenMedicoDetalle = async (req, res) => {
     }
 };
 
-// --- GENERAR PDF ---
+// --- GENERAR PDF (ESTRUCTURA ORIGINAL RESTAURADA) ---
 const generarPdfRecomendaciones = async (req, res) => {
     const { id } = req.params;
     try {
@@ -89,9 +101,8 @@ const generarPdfRecomendaciones = async (req, res) => {
 
         const data = result.recordset[0];
         
-        // 1. BUFFER PAGES (Paginación automática)
+        // 1. Configuración Documento
         const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
-
         const filename = `Recomendaciones-${data.CedulaColaborador || 'NA'}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -121,15 +132,16 @@ const generarPdfRecomendaciones = async (req, res) => {
         
         doc.moveDown(0.3);
         
-        // Guardar posición Y para la paginación (debajo del título)
+        // Guardar Y para paginación
         const subtitleY = doc.y; 
         doc.fontSize(9);
-        doc.moveDown(1); // Espacio reservado
+        doc.moveDown(1); 
 
         doc.moveDown(2);
         doc.y = y + logoHeight + 30;
         doc.fillColor('#000000'); 
 
+        // Función Helper Original
         const seccion = (titulo) => {
             doc.moveDown(1);
             doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000')
@@ -138,7 +150,7 @@ const generarPdfRecomendaciones = async (req, res) => {
             doc.font('Helvetica').fontSize(10).fillColor('#000000');
         };
 
-        // === DATOS ===
+        // === DATOS (Estructura Original) ===
         let contentX = 50;
         let contentY = doc.y;
         doc.y = contentY;
@@ -147,7 +159,7 @@ const generarPdfRecomendaciones = async (req, res) => {
         doc.text(`Nombre: ${data.NombreColaborador || ''}`, contentX);
         doc.text(`C.C: ${data.CedulaColaborador || ''}`, contentX);
         
-        const fechaExamenStr = new Date(data.FechaExamen).toLocaleDateString('es-CO', { timeZone: 'UTC' });
+        const fechaExamenStr = data.FechaExamen ? new Date(data.FechaExamen).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : 'N/A';
         doc.text(`Fecha del Examen: ${fechaExamenStr}`, contentX);
         
         doc.text(`Tipo de Examen: ${data.TipoExamen || ''}`, contentX);
@@ -156,7 +168,13 @@ const generarPdfRecomendaciones = async (req, res) => {
         seccion("Información del concepto");
         doc.text(`Persona que emite el concepto (Médico): ${data.MedicoEspecialista || 'No registra'}`, contentX);
         doc.text(`Entidad que emite el concepto (ARL/EPS): ${data.EntidadEmite || 'No registra'}`, contentX);
-        doc.text(`Duración de las recomendaciones: ${data.DuracionRecomendaciones || 'No registra'}`, contentX);
+        
+        // CAMBIO AQUÍ: Usamos la fecha en vez del texto de duración
+        let fechaFinStr = 'Indefinida / No aplica';
+        if (data.FechaFinRecomendaciones) {
+            fechaFinStr = new Date(data.FechaFinRecomendaciones).toLocaleDateString('es-CO', { timeZone: 'UTC' });
+        }
+        doc.text(`Fecha de terminación de recomendaciones: ${fechaFinStr}`, contentX);
 
         seccion("Temas tratados: breve resumen del caso");
         doc.text(data.ResumenCaso || 'No se registró un resumen del caso.', contentX, doc.y, { width: 480, align: 'justify' });
@@ -170,8 +188,7 @@ const generarPdfRecomendaciones = async (req, res) => {
         seccion("Compromisos");
         doc.text(data.Compromisos || 'Sin compromisos registrados.', contentX, doc.y, { width: 480, align: 'justify' });
 
-        // === FIRMAS (Restaurado al formato ORIGINAL) ===
-        
+        // === FIRMAS ===
         if (doc.y > 600) doc.addPage(); 
 
         doc.moveDown(4);
@@ -179,35 +196,30 @@ const generarPdfRecomendaciones = async (req, res) => {
         doc.moveDown(3);
         doc.font('Helvetica').fontSize(10);
         
-        // Formato vertical exacto como pediste
         doc.text('___________________________________', contentX);
         doc.text('Nombre:', contentX);
         doc.text('Cargo/Empresa:', contentX);
         doc.text('N° Identificación:', contentX);
         doc.text('Firma:', contentX);
 
-        // === 2. ESCRITURA FINAL DE PÁGINAS ===
+        // === NUMERACIÓN DE PÁGINAS ===
         const range = doc.bufferedPageRange();
         const totalPages = range.count;
 
         for (let i = 0; i < totalPages; i++) {
             doc.switchToPage(i);
-
             if (i === 0) {
                 const fechaEmision = new Date().toLocaleDateString('es-CO');
                 doc.font('Helvetica').fontSize(9).fillColor('#6c757d')
                    .text(
                        `Fecha Emisión: ${fechaEmision}    Fecha Revisión: ${fechaEmision}    Páginas: ${i + 1} de ${totalPages}`,
-                       headerX, 
-                       subtitleY, 
-                       { align: 'center', width: headerWidth }
+                       headerX, subtitleY, { align: 'center', width: headerWidth }
                    );
             } else {
                 doc.font('Helvetica').fontSize(9).fillColor('#6c757d')
                    .text(`Página ${i + 1} de ${totalPages}`, 50, 30, { align: 'right' });
             }
         }
-
         doc.end();
 
     } catch (err) {

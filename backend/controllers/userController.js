@@ -1,4 +1,4 @@
-// backend/controllers/userController.js
+// backend/src/controllers/userController.js
 
 import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
@@ -6,22 +6,22 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import { logAction } from '../services/logService.js';
 import { buscarEnDirectorioExterno } from '../services/externalApiService.js';
 
-// --- FUNCIÓN: BUSCAR EN API EXTERNA ---
+// --- FUNCIÓN: BUSCAR EN API EXTERNA (NÓMINA) ---
 const buscarDirectorioExterno = async (req, res) => {
-    // Si no envían query, enviamos vacío para traer la lista por defecto
     const query = req.query.query || ''; 
     
     try {
-        // 1. Axios llama a http://localhost:4000/api/gosen/empleados
         const resultados = await buscarEnDirectorioExterno(query);
         
-        // 2. Mapeamos los datos (Traducimos las columnas de Gosen a tu Frontend)
+        // 2. Mapeamos los datos (Ahora usamos el nombre real del cargo)
         const datosFormateados = resultados.map(u => ({
             Nombre: u.NombreCompleto,
             Cedula: u.Cedula,
-            // Mostramos el ID del cargo/área ya que la query SQL solo trae IDs
-            Cargo: u.CargoID ? `Cargo ${u.CargoID}` : 'Sin asignar',
-            Area: u.AreaID ? `Área ${u.AreaID}` : 'Operaciones',
+            
+            // --- CAMBIO AQUÍ: Usamos CargoNombre ---
+            Cargo: u.CargoNombre || 'Sin asignar',
+            
+            Area: u.AreaID ? `Centro Op. ${u.AreaID}` : 'Operaciones',
             Email: u.Email || 'No registrado'
         }));
 
@@ -33,7 +33,7 @@ const buscarDirectorioExterno = async (req, res) => {
     }
 };
 
-// --- FUNCIONES CRUD EXISTENTES (Sin cambios) ---
+// --- (RESTO DE FUNCIONES IGUALES) ---
 
 const crearColaborador = async (req, res) => {
     const errors = validationResult(req);
@@ -183,7 +183,7 @@ const resetPasswordColaborador = async (req, res) => {
 };
 
 const userController = {
-    buscarDirectorioExterno, // <--- IMPORTANTE: Exportada
+    buscarDirectorioExterno, 
     crearColaborador,
     getColaboradores,
     getTodosUsuarios,

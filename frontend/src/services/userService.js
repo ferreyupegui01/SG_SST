@@ -2,7 +2,7 @@
 
 import { apiFetch } from './apiService.js';
 
-// --- CRUD EXISTENTE ---
+// --- CRUD DE USUARIOS LOCALES ---
 export const getColaboradores = async () => {
     return apiFetch('/usuarios');
 };
@@ -48,8 +48,10 @@ export const resetPasswordColaborador = async (id, password) => {
     });
 };
 
-// --- NUEVA FUNCIÓN: BUSCAR EN EXTERNO ---
+// --- BÚSQUEDA EN DIRECTORIO EXTERNO (GOSEN) ---
 export const buscarUsuarioExterno = async (query) => {
-    // Llama a tu backend: /api/usuarios/externos/buscar?query=...
-    return apiFetch(`/usuarios/externos/buscar?query=${query}`);
+    // Llama a tu backend, el cual llama al microservicio
+    // Si query está vacío, el backend se encarga de traer los default
+    const safeQuery = query || '';
+    return apiFetch(`/usuarios/externos/buscar?query=${safeQuery}`);
 };

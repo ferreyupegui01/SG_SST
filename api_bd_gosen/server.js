@@ -23,22 +23,26 @@ const dbConfig = {
 
 // 2. Endpoint de Búsqueda
 app.get('/api/gosen/empleados', async (req, res) => {
-    // Si no envían q, usamos cadena vacía para traer los por defecto
     const q = req.query.q || '';
 
     try {
         const pool = await mssql.connect(dbConfig);
 
-        // --- CONSULTA SQL SEGURA (READ-ONLY) ---
+        // --- CONSULTA SQL MEJORADA (CON JOIN A OFICIOS) ---
         const query = `
             SELECT TOP 50
                 r.cod_recurso AS Cedula,
                 r.nombres + ' ' + r.apellidos AS NombreCompleto,
-                c.id_oficio AS CargoID,
+                
+                -- AQUI TRAEMOS EL NOMBRE DEL CARGO
+                o.des_oficio AS CargoNombre,
+                
                 c.id_area AS AreaID,
                 r.mail AS Email
-            FROM rh_recursos r
-            INNER JOIN rh_co_contratos c ON r.id_recurso = c.id_recurso
+            FROM [dbo].[rh_recursos] r
+            INNER JOIN [dbo].[rh_co_contratos] c ON r.id_recurso = c.id_recurso
+            -- JOIN CON LA TABLA DE OFICIOS QUE ME PASASTE
+            LEFT JOIN [dbo].[rh_oficios] o ON c.id_oficio = o.id_oficio
             WHERE 
                 c.estado = 1 
                 AND (
@@ -59,11 +63,10 @@ app.get('/api/gosen/empleados', async (req, res) => {
         console.error('❌ Error en API GOSEN:', err.message);
         res.status(500).json({ error: 'Error conectando a Nómina' });
     } finally {
-        // Cerramos la conexión inmediatamente
         await mssql.close();
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 API Gosen (Modo Lectura) corriendo en http://localhost:${PORT}`);
+    console.log(`🚀 API Gosen (Con Cargos Reales) corriendo en http://localhost:${PORT}`);
 });

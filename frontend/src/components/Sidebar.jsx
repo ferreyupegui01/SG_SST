@@ -78,7 +78,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
                         {/* --- ENLACE NUEVO: DIRECTORIO DE NÓMINA --- */}
                         <NavLink to="/directorio" className="sidebar-link" onClick={onClose}>
-                            <BsJournalRichtext /> Directorio Nómina
+                            <BsJournalRichtext /> Directorio Colaboradores
                         </NavLink>
                         {/* ------------------------------------------ */}
 

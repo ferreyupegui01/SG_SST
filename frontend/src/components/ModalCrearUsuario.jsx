@@ -6,20 +6,17 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Modal.css';
 import '../index.css'; 
 import Swal from 'sweetalert2'; 
-// Iconos
 import { BsCloudDownload, BsSearch, BsPersonPlusFill, BsPersonBadge, BsBuilding, BsBriefcase } from 'react-icons/bs';
 
 const ModalCrearUsuario = ({ alCerrar, alExito }) => {
     const { usuario } = useAuth();
 
-    // Estado del Formulario Final
     const [formData, setFormData] = useState({
         nombreCompleto: '', cedula: '', password: '',
         idRol: '', area: '', cargo: ''
     });
     
-    // Estados de la Interfaz
-    const [modo, setModo] = useState('IMPORTAR'); // 'IMPORTAR' o 'MANUAL'
+    const [modo, setModo] = useState('IMPORTAR');
     const [busquedaExterna, setBusquedaExterna] = useState('');
     const [resultadosExternos, setResultadosExternos] = useState([]);
     const [buscando, setBuscando] = useState(false);
@@ -28,12 +25,10 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // Cargar Roles al inicio
     useEffect(() => {
         const cargarRoles = async () => {
             try {
                 const rolesData = await getRoles();
-                // Filtro de seguridad: Si no es Super Admin, solo puede crear 'Colaboradores'
                 if (usuario.rol === 'Super Admin') {
                     setRolesDisponibles(rolesData);
                 } else {
@@ -54,54 +49,47 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
         setFormData(prevState => ({ ...prevState, [name]: value }));
     };
 
-    // --- LÓGICA DE BÚSQUEDA EXTERNA ---
     const handleBuscarExterno = async (e) => {
         e.preventDefault();
         if (!busquedaExterna.trim()) return;
         
         setBuscando(true);
-        setResultadosExternos([]); // Limpiar anteriores
+        setResultadosExternos([]); 
         
         try {
-            // Llama al servicio que conecta con tu Backend -> Microservicio -> SQL Externa
             const data = await buscarUsuarioExterno(busquedaExterna);
             setResultadosExternos(data);
             
             if (data.length === 0) {
-                // Feedback sutil en lugar de alerta intrusiva
-                setError('No se encontraron coincidencias en la base de datos de Nómina.');
+                setError('No se encontraron coincidencias en la base de datos de Gestión Humana.');
             } else {
                 setError('');
             }
         } catch (error) {
             console.error(error);
-            setError('Error de conexión con el servidor de nómina.');
+            setError('Error de conexión con la base de datos externa.');
         } finally {
             setBuscando(false);
         }
     };
 
     const seleccionarImportado = (usuarioExterno) => {
-        // Autocompletar formulario
         setFormData(prev => ({
             ...prev,
             nombreCompleto: usuarioExterno.Nombre,
             cedula: usuarioExterno.Cedula,
             area: usuarioExterno.Area || '',
             cargo: usuarioExterno.Cargo || '',
-            password: usuarioExterno.Cedula // Contraseña por defecto = Cédula
+            password: usuarioExterno.Cedula 
         }));
-        
-        // Cambiar a vista de formulario para que el admin elija el ROL y guarde
         setModo('MANUAL'); 
         
-        const Toast = Swal.mixin({
-            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
+        Swal.fire({
+            toast: true, position: 'top-end', icon: 'success', 
+            title: 'Datos del colaborador importados', showConfirmButton: false, timer: 3000, timerProgressBar: true
         });
-        Toast.fire({ icon: 'success', title: 'Datos cargados desde Nómina' });
     };
 
-    // --- GUARDAR ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -121,11 +109,11 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px'}}>
                 
                 <div className="modal-header">
-                    <h2>Crear Nuevo Usuario</h2>
+                    <h2>{modo === 'IMPORTAR' ? 'Importar Colaborador' : 'Crear Nuevo Usuario'}</h2>
                     <button onClick={alCerrar} className="modal-close-button">&times;</button>
                 </div>
 
-                {/* --- PESTAÑAS SUPERIORES --- */}
+                {/* PESTAÑAS */}
                 <div style={{display:'flex', marginBottom:'1.5rem', borderBottom:'1px solid #eee'}}>
                     <button 
                         type="button"
@@ -135,7 +123,8 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
                             color: modo === 'IMPORTAR' ? '#007BFF' : '#666', fontWeight:'bold', cursor:'pointer'
                         }}
                     >
-                        <BsCloudDownload /> Importar de Nómina
+                        {/* --- CAMBIO DE NOMBRE --- */}
+                        <BsCloudDownload /> Importar Colaborador
                     </button>
                     <button 
                         type="button"
@@ -149,11 +138,11 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
                     </button>
                 </div>
 
-                {/* --- VISTA 1: BUSCADOR EXTERNO --- */}
+                {/* VISTA 1: BUSCADOR EXTERNO */}
                 {modo === 'IMPORTAR' ? (
                     <div className="modal-body">
                         <p style={{fontSize:'0.9rem', color:'#666', marginBottom:'1rem'}}>
-                            Busque el empleado en la base de datos de RRHH por <strong>Cédula</strong> o <strong>Nombre</strong>.
+                            Busque el colaborador en la base de datos externa por <strong>Cédula</strong> o <strong>Nombre</strong>.
                         </p>
 
                         <form onSubmit={handleBuscarExterno} style={{display:'flex', gap:'10px', marginBottom:'1rem'}}>
@@ -169,7 +158,6 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
                             </button>
                         </form>
                         
-                        {/* LISTA DE RESULTADOS */}
                         <div style={{maxHeight:'300px', overflowY:'auto', border:'1px solid #eee', borderRadius:'8px', backgroundColor:'#f9f9f9'}}>
                             
                             {!buscando && resultadosExternos.length === 0 && !error && (
@@ -212,10 +200,9 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
                         {error && <p className="modal-error" style={{marginTop:'1rem'}}>{error}</p>}
                     </div>
                 ) : (
-                    /* --- VISTA 2: FORMULARIO --- */
+                    /* VISTA 2: FORMULARIO NORMAL */
                     <form onSubmit={handleSubmit}>
                         <div className="modal-body" style={{maxHeight:'60vh', overflowY:'auto'}}>
-                            
                             <div className="form-group">
                                 <label>Nombre Completo *</label>
                                 <input type="text" name="nombreCompleto" className="form-control" value={formData.nombreCompleto} onChange={handleChange} required />
@@ -253,7 +240,7 @@ const ModalCrearUsuario = ({ alCerrar, alExito }) => {
                             </div>
 
                             <div className="form-group">
-                                <label>Contraseña Temporal *</label>
+                                <label>Contraseña*</label>
                                 <input type="password" name="password" className="form-control" value={formData.password} onChange={handleChange} required placeholder="Mínimo 6 caracteres" />
                                 <small style={{color:'#666'}}>Por defecto se sugiere la cédula.</small>
                             </div>
