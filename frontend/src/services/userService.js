@@ -3,6 +3,7 @@
 import { apiFetch } from './apiService.js';
 
 // --- CRUD DE USUARIOS LOCALES ---
+
 export const getColaboradores = async () => {
     return apiFetch('/usuarios');
 };
@@ -17,6 +18,11 @@ export const getUsuarioByCedula = async (cedula) => {
 
 export const getRoles = async () => {
     return apiFetch('/usuarios/roles');
+};
+
+// --- NUEVA FUNCIÓN: TRAER CARGOS DE BD ---
+export const getCargosEmpresa = async () => {
+    return apiFetch('/usuarios/cargos');
 };
 
 export const crearColaborador = async (datosUsuario) => {
@@ -51,7 +57,6 @@ export const resetPasswordColaborador = async (id, password) => {
 // --- BÚSQUEDA EN DIRECTORIO EXTERNO (GOSEN) ---
 export const buscarUsuarioExterno = async (query) => {
     // Llama a tu backend, el cual llama al microservicio
-    // Si query está vacío, el backend se encarga de traer los default
     const safeQuery = query || '';
     return apiFetch(`/usuarios/externos/buscar?query=${safeQuery}`);
 };

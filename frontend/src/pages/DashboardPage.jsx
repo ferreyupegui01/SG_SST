@@ -76,7 +76,7 @@ const DashboardColaborador = ({ usuario }) => {
             </div>
             <div className="report-cards-container">
                 <Link to="/reportar-maquina" className="report-card">
-                    <h2>Reportar Estado de Máquina</h2>
+                    <h2>Reportar Estado de Máquina y vehiculos</h2>
                     <p>Diligenciar el reporte pre-uso de su equipo.</p>
                 </Link>
                 <Link to="/reportar-seguridad" className="report-card">

@@ -13,7 +13,20 @@ export const buscarEnDirectorioExterno = async (termino) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error llamando a API Gosen:", error.message);
+        console.error("Error llamando a API Gosen (Búsqueda):", error.message);
         return []; // Retorna vacío si falla la conexión
+    }
+};
+
+// --- NUEVA FUNCIÓN PARA PESV ---
+export const obtenerConductoresGosen = async () => {
+    try {
+        const response = await axios.get(`${API_URL}/conductores-activos`, {
+            timeout: 5000 
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error obteniendo conductores de Gosen:", error.message);
+        return []; 
     }
 };

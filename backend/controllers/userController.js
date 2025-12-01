@@ -1,4 +1,4 @@
-// backend/src/controllers/userController.js
+// backend/controllers/userController.js
 
 import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
@@ -6,21 +6,19 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import { logAction } from '../services/logService.js';
 import { buscarEnDirectorioExterno } from '../services/externalApiService.js';
 
-// --- FUNCIÓN: BUSCAR EN API EXTERNA (NÓMINA) ---
+// --- FUNCIÓN: BUSCAR EN API EXTERNA (NÓMINA/GOSEN) ---
 const buscarDirectorioExterno = async (req, res) => {
     const query = req.query.query || ''; 
     
     try {
         const resultados = await buscarEnDirectorioExterno(query);
         
-        // 2. Mapeamos los datos (Ahora usamos el nombre real del cargo)
+        // Mapeamos los datos para el frontend
         const datosFormateados = resultados.map(u => ({
             Nombre: u.NombreCompleto,
             Cedula: u.Cedula,
-            
-            // --- CAMBIO AQUÍ: Usamos CargoNombre ---
+            // Usamos el nombre real del cargo que viene de Gosen
             Cargo: u.CargoNombre || 'Sin asignar',
-            
             Area: u.AreaID ? `Centro Op. ${u.AreaID}` : 'Operaciones',
             Email: u.Email || 'No registrado'
         }));
@@ -33,7 +31,7 @@ const buscarDirectorioExterno = async (req, res) => {
     }
 };
 
-// --- (RESTO DE FUNCIONES IGUALES) ---
+// --- CRUD DE USUARIOS LOCALES ---
 
 const crearColaborador = async (req, res) => {
     const errors = validationResult(req);
@@ -182,6 +180,20 @@ const resetPasswordColaborador = async (req, res) => {
     }
 };
 
+// --- NUEVA FUNCIÓN: OBTENER CARGOS DE DB ---
+const getCargosEmpresa = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('EXEC SP_GET_CargosEmpresa');
+        // Transformamos el recordset en un array simple de strings
+        const lista = result.recordset.map(item => item.NombreCargo);
+        res.json(lista);
+    } catch (err) {
+        console.error('Error obteniendo cargos:', err.message);
+        res.status(500).send('Error del servidor');
+    }
+};
+
 const userController = {
     buscarDirectorioExterno, 
     crearColaborador,
@@ -191,7 +203,8 @@ const userController = {
     getRoles,
     editarColaborador,
     cambiarEstadoColaborador,
-    resetPasswordColaborador
+    resetPasswordColaborador,
+    getCargosEmpresa // <--- EXPORTADA
 };
 
 export default userController;

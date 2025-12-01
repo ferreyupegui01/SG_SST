@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Sidebar.css'; 
 import logo from "../assets/logo-empaquetados.png";
 
+// Importamos iconos profesionales
 import { 
     BsGrid1X2Fill, BsPeopleFill, BsCalendarWeek, BsClipboard2CheckFill, 
     BsExclamationTriangleFill, BsGraphUpArrow, BsHouseFill, BsCpuFill, 
@@ -18,12 +19,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     const { usuario } = useAuth(); 
     const containerClass = `sidebar-container ${isOpen ? 'open' : ''}`;
 
+    // Definimos los roles claramente
     const isSuperAdmin = usuario?.rol === 'Super Admin';
     const isAdminSST = usuario?.rol === 'Administrador SST';
     const isCalidad = usuario?.rol === 'Gestion de Calidad';
     const isColaborador = usuario?.rol === 'Colaborador';
-
-    const isGestorSST = isAdminSST || isSuperAdmin;
 
     return (
         <aside className={containerClass}>
@@ -35,60 +35,83 @@ const Sidebar = ({ isOpen, onClose }) => {
 
             <nav className="sidebar-nav">
                 
-                {/* SUPER ADMIN */}
+                {/* =================================================
+                   MENÚ EXCLUSIVO SUPER ADMIN (Estratégico + Aprobaciones)
+                   ================================================= */}
                 {isSuperAdmin && (
                     <>
-                        <div className="sidebar-section-label">SUPER ADMIN</div>
+                        <div className="sidebar-section-label">CENTRO DE COMANDO</div>
+                        
                         <NavLink to="/super-admin/dashboard" className="sidebar-link" onClick={onClose}>
-                            <BsShieldLockFill /> Panel de Control
+                            <BsShieldLockFill /> Dashboard Global
                         </NavLink>
+
+                        <div className="sidebar-section-label">ADMINISTRACIÓN</div>
+
+                        <NavLink to="/usuarios" className="sidebar-link" onClick={onClose}>
+                            <BsPeopleFill /> Gestión de Usuarios
+                        </NavLink>
+
+                        <NavLink to="/pesv" className="sidebar-link" onClick={onClose}>
+                            <BsConeStriped /> Gestión PESV (Estratégico)
+                        </NavLink>
+
                         <NavLink to="/super-admin/formularios" className="sidebar-link" onClick={onClose}>
                             <BsListCheck /> Gestor de Formularios
                         </NavLink>
+
+                        <div className="sidebar-section-label">APROBACIONES</div>
+
+                        <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
+                            <BsEnvelopeExclamation /> Solicitudes y Firmas
+                        </NavLink>
+
+                        <div className="sidebar-section-label">SEGURIDAD</div>
+
                         <NavLink to="/logs" className="sidebar-link" onClick={onClose}>
                             <BsFileEarmarkTextFill /> Auditoría (Logs)
                         </NavLink>
                     </>
                 )}
 
-                {/* CALIDAD */}
+                {/* =================================================
+                   MENÚ GESTIÓN DE CALIDAD
+                   ================================================= */}
                 {isCalidad && (
                     <>
                         <div className="sidebar-section-label">CALIDAD</div>
                         <NavLink to="/calidad/dashboard" className="sidebar-link" onClick={onClose}>
                             <BsJournalCheck /> Dashboard Calidad
                         </NavLink>
+                        <NavLink to="/documentos" className="sidebar-link" onClick={onClose}>
+                            <BsFillFolderFill /> Gestión Documental
+                        </NavLink>
+                        <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
+                            <BsGraphUpArrow /> Acciones (ACPM)
+                        </NavLink>
                     </>
                 )}
 
-                {/* GESTIÓN SST */}
-                {isGestorSST && (
+                {/* =================================================
+                   MENÚ OPERATIVO SST (Solo para Admin SST)
+                   ================================================= */}
+                {isAdminSST && (
                     <>
-                        <div className="sidebar-section-label">GESTIÓN SST</div>
+                        <div className="sidebar-section-label">GESTIÓN OPERATIVA</div>
                         
-                        {!isSuperAdmin && (
-                            <NavLink to="/dashboard" className="sidebar-link" onClick={onClose}>
-                                <BsGrid1X2Fill /> Dashboard Operativo
-                            </NavLink>
-                        )}
-
-                        <NavLink to="/usuarios" className="sidebar-link" onClick={onClose}>
-                            <BsPeopleFill /> Usuarios
+                        <NavLink to="/dashboard" className="sidebar-link" onClick={onClose}>
+                            <BsGrid1X2Fill /> Dashboard SST
                         </NavLink>
 
-                        {/* --- ENLACE NUEVO: DIRECTORIO DE NÓMINA --- */}
+                        <NavLink to="/usuarios" className="sidebar-link" onClick={onClose}>
+                            <BsPeopleFill /> Usuarios Locales
+                        </NavLink>
+
                         <NavLink to="/directorio" className="sidebar-link" onClick={onClose}>
                             <BsJournalRichtext /> Directorio Colaboradores
                         </NavLink>
-                        {/* ------------------------------------------ */}
 
-                        <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
-                            <BsEnvelopeExclamation /> Solicitudes
-                        </NavLink>
-
-                        <NavLink to="/indicadores" className="sidebar-link" onClick={onClose}>
-                            <BsBarChartFill /> Indicadores
-                        </NavLink>
+                        <div className="sidebar-section-label">PROCESOS</div>
 
                         <NavLink to="/planificacion" className="sidebar-link" onClick={onClose}>
                             <BsCalendarWeek /> Planificación
@@ -103,19 +126,29 @@ const Sidebar = ({ isOpen, onClose }) => {
                         </NavLink>
 
                         <NavLink to="/activos" className="sidebar-link" onClick={onClose}>
-                            <BsArchiveFill /> Activos
+                            <BsArchiveFill /> Activos y Equipos
                         </NavLink>
 
                         <NavLink to="/reportes" className="sidebar-link" onClick={onClose}>
-                            <BsExclamationTriangleFill /> Reportes
+                            <BsExclamationTriangleFill /> Reportes Colaboradores
+                        </NavLink>
+
+                        <div className="sidebar-section-label">ANÁLISIS Y CIERRE</div>
+
+                        <NavLink to="/indicadores" className="sidebar-link" onClick={onClose}>
+                            <BsBarChartFill /> Indicadores
                         </NavLink>
 
                         <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
                             <BsGraphUpArrow /> Acciones (ACPM)
                         </NavLink>
 
+                        <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
+                            <BsEnvelopeExclamation /> Solicitudes a Gerencia
+                        </NavLink>
+
                         <NavLink to="/documentos" className="sidebar-link" onClick={onClose}>
-                            <BsFillFolderFill /> Gestión Documental
+                            <BsFillFolderFill /> Documentación
                         </NavLink>
 
                         <NavLink to="/medicina" className="sidebar-link" onClick={onClose}>
@@ -124,10 +157,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                 )}
 
-                {/* COLABORADOR */}
+                {/* =================================================
+                   MENÚ COLABORADOR (Reportes)
+                   ================================================= */}
                 {isColaborador && (
                     <>
-                        <div className="sidebar-section-label">COLABORADOR</div>
+                        <div className="sidebar-section-label">MI GESTIÓN</div>
                         <NavLink to="/dashboard" className="sidebar-link" onClick={onClose}>
                             <BsHouseFill /> Inicio
                         </NavLink>
@@ -144,7 +179,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <div className="sidebar-footer">
                 <span style={{padding: '1rem', fontSize: '0.75rem', color: '#ffffff80', display: 'block', textAlign: 'center'}}>
                     {usuario?.nombre}<br/>
-                    <strong style={{ color: 'white' }}>{usuario?.rol}</strong>
+                    <strong style={{ color: 'white', textTransform: 'uppercase' }}>{usuario?.rol}</strong>
                 </span>
             </div>
         </aside>

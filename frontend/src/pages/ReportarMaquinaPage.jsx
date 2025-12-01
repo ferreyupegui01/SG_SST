@@ -1,6 +1,6 @@
 // frontend/src/pages/ReportarMaquinaPage.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getActivosTodos } from '../services/assetService'; 
 import { crearReporteMaquina } from '../services/reportService';
@@ -9,24 +9,34 @@ import { useAuth } from '../context/AuthContext';
 import '../index.css'; 
 import '../style/ReportarPage.css'; 
 import Swal from 'sweetalert2'; 
-import { BsArrowLeftCircle, BsCheckCircle, BsExclamationTriangle, BsSpeedometer2 } from 'react-icons/bs';
+import { BsArrowLeftCircle, BsSpeedometer2, BsSearch, BsChevronDown } from 'react-icons/bs';
 
 const ReportarMaquinaPage = () => {
     const { usuario } = useAuth(); 
     
+    // Estados del Reporte
     const [idActivo, setIdActivo] = useState('');
     const [kilometraje, setKilometraje] = useState('');
     const [estadoReportado, setEstadoReportado] = useState('OK');
     const [descripcionProblema, setDescripcionProblema] = useState('');
     const [fotoReporte, setFotoReporte] = useState(null); 
     
+    // Estados de Datos Maestros
     const [listaActivos, setListaActivos] = useState([]);
     const [listaFormularios, setListaFormularios] = useState([]);
     
+    // Estados para el Buscador Inteligente
+    const [busquedaActivo, setBusquedaActivo] = useState('');
+    const [activosFiltrados, setActivosFiltrados] = useState([]);
+    const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
+    const wrapperRef = useRef(null); // Detectar clic fuera
+
+    // Estados de Lógica Interna
     const [activoInfo, setActivoInfo] = useState(null);
     const [preguntasActivas, setPreguntasActivas] = useState([]);
     const [respuestasChecklist, setRespuestasChecklist] = useState({});
     
+    // Estados de UI
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isLoadingPreguntas, setIsLoadingPreguntas] = useState(false);
     const [isLoadingSubmit, setIsLoadingSubmit] = useState(false);
@@ -50,11 +60,12 @@ const ReportarMaquinaPage = () => {
 
                 const tiposPermitidos = formulariosVisibles.map(f => f.TipoActivoAsociado.toLowerCase().trim());
 
-                const activosFiltrados = activos.filter(a => 
+                const activosFiltradosBD = activos.filter(a => 
                     a.TipoActivo && tiposPermitidos.includes(a.TipoActivo.toLowerCase().trim())
                 );
 
-                setListaActivos(activosFiltrados);
+                setListaActivos(activosFiltradosBD);
+                setActivosFiltrados(activosFiltradosBD); // Inicializamos el filtro con todos
 
             } catch (err) {
                 console.error(err);
@@ -66,7 +77,46 @@ const ReportarMaquinaPage = () => {
         cargarDatosMaestros();
     }, []);
 
-    // 2. Buscar Formulario
+    // 2. Manejador de clics fuera del buscador
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                setMostrarSugerencias(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [wrapperRef]);
+
+    // 3. Lógica del Buscador de Activos
+    const handleSearchChange = (e) => {
+        const texto = e.target.value;
+        setBusquedaActivo(texto);
+        
+        // Si borra el texto, reseteamos selección
+        if (texto === '') {
+            setIdActivo('');
+            setActivoInfo(null);
+            setPreguntasActivas([]);
+        }
+
+        // Filtrar por Nombre o Código
+        const filtrados = listaActivos.filter(a => 
+            a.NombreDescriptivo.toLowerCase().includes(texto.toLowerCase()) ||
+            a.CodigoIdentificador.toLowerCase().includes(texto.toLowerCase())
+        );
+        setActivosFiltrados(filtrados);
+        setMostrarSugerencias(true);
+    };
+
+    const seleccionarActivo = (activo) => {
+        setBusquedaActivo(`${activo.NombreDescriptivo} (${activo.CodigoIdentificador})`);
+        setIdActivo(activo.ID_Activo);
+        setMostrarSugerencias(false);
+        // El useEffect de abajo se encargará de cargar el formulario al detectar cambio en idActivo
+    };
+
+    // 4. Buscar Formulario y Preguntas (Se dispara al seleccionar activo)
     useEffect(() => {
         if (!idActivo) {
             setPreguntasActivas([]);
@@ -133,7 +183,6 @@ const ReportarMaquinaPage = () => {
         e.preventDefault();
         setError('');
 
-        // Validación Kilometraje
         const esTipoVehiculo = ['vehiculo', 'moto', 'montacarga', 'carro', 'camion', 'tractomula', 'furgon'].some(t => 
             activoInfo?.TipoActivo.toLowerCase().includes(t)
         );
@@ -162,7 +211,6 @@ const ReportarMaquinaPage = () => {
             formData.append('datosReporte', JSON.stringify(reporteDetallado));
         }
 
-        // --- CORRECCIÓN AQUÍ: Enviamos la descripción SIEMPRE que tenga texto ---
         if (descripcionProblema.trim()) {
             formData.append('descripcionProblema', descripcionProblema);
         }
@@ -173,7 +221,10 @@ const ReportarMaquinaPage = () => {
             await crearReporteMaquina(formData);
             Swal.fire('Enviado', 'Reporte registrado exitosamente.', 'success');
             
+            // Resetear todo
             setIdActivo('');
+            setBusquedaActivo(''); // Limpiar buscador
+            setActivosFiltrados(listaActivos); // Resetear lista filtrada
             setEstadoReportado('OK');
             setDescripcionProblema('');
             setKilometraje('');
@@ -199,17 +250,62 @@ const ReportarMaquinaPage = () => {
             <div className="page-content-card" style={{ maxWidth: '800px', margin: '0 auto' }}>
                 <form onSubmit={handleSubmit}>
                     
-                    <div className="form-group">
+                    {/* --- BUSCADOR INTELIGENTE DE EQUIPO --- */}
+                    <div className="form-group" ref={wrapperRef}>
                         <label>Seleccione el Equipo:</label>
-                        {isLoadingData ? <p>Cargando activos...</p> : (
-                            <select className="form-control" value={idActivo} onChange={(e) => setIdActivo(e.target.value)} required>
-                                <option value="" disabled>-- Seleccione --</option>
-                                {listaActivos.map(a => (
-                                    <option key={a.ID_Activo} value={a.ID_Activo}>
-                                        {a.NombreDescriptivo} ({a.TipoActivo}) - {a.CodigoIdentificador}
-                                    </option>
-                                ))}
-                            </select>
+                        {isLoadingData ? (
+                            <p>Cargando activos...</p>
+                        ) : (
+                            <div style={{position: 'relative'}}>
+                                <BsSearch style={{position: 'absolute', top: '12px', left: '12px', color: '#999', zIndex: 1}}/>
+                                <input 
+                                    type="text" 
+                                    className="form-control" 
+                                    style={{paddingLeft: '35px', paddingRight: '30px'}} 
+                                    placeholder="Buscar por nombre, placa o código..." 
+                                    value={busquedaActivo}
+                                    onChange={handleSearchChange}
+                                    onFocus={() => setMostrarSugerencias(true)}
+                                    required
+                                    autoComplete="off"
+                                />
+                                <BsChevronDown style={{position: 'absolute', top: '12px', right: '12px', color: '#999', cursor:'pointer'}} onClick={() => setMostrarSugerencias(!mostrarSugerencias)}/>
+
+                                {/* LISTA FLOTANTE */}
+                                {mostrarSugerencias && (
+                                    <div style={{
+                                        position: 'absolute', top: '100%', left: 0, right: 0,
+                                        backgroundColor: 'white', border: '1px solid #dee2e6',
+                                        borderRadius: '0 0 8px 8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                        maxHeight: '250px', overflowY: 'auto', zIndex: 1000
+                                    }}>
+                                        {activosFiltrados.length > 0 ? (
+                                            activosFiltrados.map((a) => (
+                                                <div 
+                                                    key={a.ID_Activo} 
+                                                    onClick={() => seleccionarActivo(a)}
+                                                    style={{
+                                                        padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0',
+                                                        display: 'flex', flexDirection: 'column'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
+                                                >
+                                                    <span style={{fontWeight: '600', color: '#333'}}>{a.NombreDescriptivo}</span>
+                                                    <div style={{fontSize: '0.8rem', color: '#666', display:'flex', justifyContent:'space-between'}}>
+                                                        <span>Código: {a.CodigoIdentificador}</span>
+                                                        <span style={{textTransform:'uppercase', fontSize:'0.7rem', backgroundColor:'#e9ecef', padding:'2px 6px', borderRadius:'4px'}}>{a.TipoActivo}</span>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{padding: '15px', textAlign: 'center', color: '#999'}}>
+                                                No se encontraron equipos.
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
 

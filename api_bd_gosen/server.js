@@ -21,27 +21,22 @@ const dbConfig = {
     }
 };
 
-// 2. Endpoint de Búsqueda
+// 2. Endpoint de Búsqueda General (Se mantiene igual)
 app.get('/api/gosen/empleados', async (req, res) => {
     const q = req.query.q || '';
 
     try {
         const pool = await mssql.connect(dbConfig);
 
-        // --- CONSULTA SQL MEJORADA (CON JOIN A OFICIOS) ---
         const query = `
             SELECT TOP 50
                 r.cod_recurso AS Cedula,
                 r.nombres + ' ' + r.apellidos AS NombreCompleto,
-                
-                -- AQUI TRAEMOS EL NOMBRE DEL CARGO
                 o.des_oficio AS CargoNombre,
-                
                 c.id_area AS AreaID,
                 r.mail AS Email
             FROM [dbo].[rh_recursos] r
             INNER JOIN [dbo].[rh_co_contratos] c ON r.id_recurso = c.id_recurso
-            -- JOIN CON LA TABLA DE OFICIOS QUE ME PASASTE
             LEFT JOIN [dbo].[rh_oficios] o ON c.id_oficio = o.id_oficio
             WHERE 
                 c.estado = 1 
@@ -67,6 +62,44 @@ app.get('/api/gosen/empleados', async (req, res) => {
     }
 });
 
+// 3. NUEVO ENDPOINT: Obtener Conductores y Montacarguistas (CORREGIDO)
+app.get('/api/gosen/conductores-activos', async (req, res) => {
+    try {
+        const pool = await mssql.connect(dbConfig);
+
+        // CONSULTA AJUSTADA A LA LISTA REAL DE CARGOS
+        const query = `
+            SELECT 
+                r.cod_recurso AS Cedula,
+                r.nombres + ' ' + r.apellidos AS NombreCompleto,
+                o.des_oficio AS CargoNombre,
+                r.mail AS Email
+            FROM [dbo].[rh_recursos] r
+            INNER JOIN [dbo].[rh_co_contratos] c ON r.id_recurso = c.id_recurso
+            LEFT JOIN [dbo].[rh_oficios] o ON c.id_oficio = o.id_oficio
+            WHERE 
+                c.estado = 1 -- Solo empleados activos
+                AND (
+                    o.des_oficio LIKE '%CONDUCTOR%' OR        -- Atrapa: CONDUCTOR, CONDUCTOR MAYORISTA
+                    o.des_oficio LIKE '%MONTACARGUISTA%' OR   -- Atrapa: MONTACARGUISTA, MONTACARGUISTA RECIBO
+                    o.des_oficio LIKE '%MOTOCARGUISTA%' OR    -- Atrapa: MOTOCARGUISTA
+                    o.des_oficio LIKE '%CHOFER%' OR 
+                    o.des_oficio LIKE '%TRANSPORTADOR%'
+                )
+            ORDER BY r.nombres ASC
+        `;
+
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+
+    } catch (err) {
+        console.error('❌ Error obteniendo conductores GOSEN:', err.message);
+        res.status(500).json({ error: 'Error consultando conductores externos' });
+    } finally {
+        await mssql.close();
+    }
+});
+
 app.listen(PORT, () => {
-    console.log(`🚀 API Gosen (Con Cargos Reales) corriendo en http://localhost:${PORT}`);
+    console.log(`🚀 API Gosen (Cargos: Montacarguista/Conductor) corriendo en http://localhost:${PORT}`);
 });

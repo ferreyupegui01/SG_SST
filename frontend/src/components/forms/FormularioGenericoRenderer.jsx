@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-// frontend/src/componentes/forms/FormularioGenericoRenderer.jsx
+// frontend/src/components/forms/FormularioGenericoRenderer.jsx
 
 import React, { useState, useEffect } from 'react';
 import '../../style/InspeccionesPage.css';
@@ -10,9 +10,16 @@ const ChecklistItem = ({ id, label, value, onRespuestaChange, onObservacionChang
         <div className="checklist-item">
             <label className="item-label">{label}</label>
             <div className="checklist-options">
-                {['B', 'R', 'M', 'NA'].map(val => (
-                    <label key={val} className="radio-label">
-                        <input type="radio" name={id} value={val} checked={value.respuesta === val} onChange={() => onRespuestaChange(id, val)} />
+                {/* Opciones Estandarizadas: C (Cumple), NC (No Cumple), NA (No Aplica) */}
+                {['C', 'NC', 'NA'].map(val => (
+                    <label key={val} className={`radio-label-cn ${val === 'C' ? 'radio-cumple' : val === 'NC' ? 'radio-nocumple' : ''}`}>
+                        <input 
+                            type="radio" 
+                            name={id} 
+                            value={val} 
+                            checked={value.respuesta === val} 
+                            onChange={() => onRespuestaChange(id, val)} 
+                        />
                         <span>{val}</span>
                     </label>
                 ))}
@@ -27,44 +34,58 @@ const ChecklistItem = ({ id, label, value, onRespuestaChange, onObservacionChang
 
 const FormularioGenericoRenderer = ({ preguntas, onFormChange, onResultadoChange }) => {
     
+    // Inicializamos el estado usando las preguntas que llegan de la BD
     const initialState = preguntas.reduce((acc, p) => {
-        acc[p.CodigoPregunta] = { respuesta: '', observacion: '' };
+        acc[p.CodigoPregunta] = { 
+            respuesta: '', 
+            observacion: '',
+            // --- ESTO ES LO NUEVO: Guardamos el texto para persistencia en JSON ---
+            textoPregunta: p.TextoPregunta 
+        };
         return acc;
     }, {});
 
     const [respuestas, setRespuestas] = useState(initialState);
 
     useEffect(() => {
-        const tieneHallazgos = Object.values(respuestas).some(v => v.respuesta === 'R' || v.respuesta === 'M' || v.respuesta === 'NC');
+        // Lógica automática de resultado (Si hay un No Cumple, el resultado es Con Hallazgos)
+        const tieneHallazgos = Object.values(respuestas).some(v => v.respuesta === 'NC' || v.respuesta === 'M' || v.respuesta === 'R');
         onResultadoChange(tieneHallazgos ? 'Con Hallazgos' : 'OK');
         
-        // Comunicar cambios al padre (SOLO checklist)
+        // Enviamos el objeto completo (incluyendo textoPregunta) al padre para guardar en BD
         onFormChange({ checklist: respuestas });
     }, [respuestas, onFormChange, onResultadoChange]);
 
     const handleRespuestaChange = (key, valor) => {
-        setRespuestas(prev => ({ ...prev, [key]: { ...prev[key], respuesta: valor } }));
+        setRespuestas(prev => ({ 
+            ...prev, 
+            [key]: { ...prev[key], respuesta: valor } 
+        }));
     };
+    
     const handleObservacionChange = (key, valor) => {
-        setRespuestas(prev => ({ ...prev, [key]: { ...prev[key], observacion: valor } }));
+        setRespuestas(prev => ({ 
+            ...prev, 
+            [key]: { ...prev[key], observacion: valor } 
+        }));
     };
 
-    if (!preguntas || preguntas.length === 0) return <p>No se encontraron preguntas para este formulario. Verifique la estructura en el backend.</p>;
+    if (!preguntas || preguntas.length === 0) return <p>No hay preguntas configuradas.</p>;
 
     return (
         <div className="form-checklist-container">
-            <h3>Checklist Dinámico</h3>
             {preguntas.map((p, index) => (
                 <ChecklistItem 
                     key={p.ID_Pregunta} 
                     id={p.CodigoPregunta} 
-                    label={`${p.Orden}. ${p.TextoPregunta}`}
+                    // Mostramos "1. Pregunta..."
+                    label={`${p.Orden ? p.Orden + '.' : ''} ${p.TextoPregunta}`}
+                    // Pasamos el estado actual o un objeto vacío seguro
                     value={respuestas[p.CodigoPregunta] || { respuesta: '', observacion: '' }}
                     onRespuestaChange={handleRespuestaChange}
                     onObservacionChange={handleObservacionChange}
                 />
             ))}
-            {/* SE ELIMINÓ EL TEXTAREA DE OBSERVACIONES GENERALES */}
         </div>
     );
 };

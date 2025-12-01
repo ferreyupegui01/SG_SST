@@ -4,27 +4,40 @@ import React, { useState, useEffect } from 'react';
 import { getConductoresPESV, getMantenimientos } from '../services/pesvService';
 import { getActivosTodos } from '../services/assetService';
 import '../index.css';
-import { BsConeStriped, BsPersonBadge, BsTools, BsTruck, BsPlusLg, BsPencilSquare, BsCheckCircle, BsFileEarmarkText } from 'react-icons/bs';
+// CORRECCIÓN: Se agregó BsPlusLg a la lista de importaciones
+import { 
+    BsConeStriped, BsPersonBadge, BsTools, BsTruck, 
+    BsCheckCircle, BsPencilSquare, BsPersonPlusFill, BsEyeFill, BsPlusLg 
+} from 'react-icons/bs';
+import Swal from 'sweetalert2';
 
 // Importamos los componentes hijos
 import ModalGestionConductor from '../components/ModalGestionConductor';
 import ModalCrearMantenimiento from '../components/ModalCrearMantenimiento';
 import TabPasosPESV from '../components/TabPasosPESV'; 
+import ModalCrearUsuario from '../components/ModalCrearUsuario'; 
 
 const PesvPage = () => {
+    // URL Base para abrir los documentos adjuntos
+    const API_BASE_URL = 'http://localhost:5000';
+
     // Estado de Pestañas
     const [activeTab, setActiveTab] = useState('implementacion'); 
     
     // Estados de Datos
     const [conductores, setConductores] = useState([]);
     const [mantenimientos, setMantenimientos] = useState([]);
-    const [vehiculos, setVehiculos] = useState([]); // Todos los activos tipo vehículo
+    const [vehiculos, setVehiculos] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
 
     // Estados de Modales
     const [modalConductorOpen, setModalConductorOpen] = useState(false);
     const [conductorSelected, setConductorSelected] = useState(null);
     const [modalMtoOpen, setModalMtoOpen] = useState(false);
+    
+    // Estados para crear usuario (Flujo continuo)
+    const [modalCrearUsuarioOpen, setModalCrearUsuarioOpen] = useState(false);
+    const [usuarioPrellenado, setUsuarioPrellenado] = useState(null);
 
     // Cargar datos al cambiar de pestaña
     useEffect(() => {
@@ -32,7 +45,6 @@ const PesvPage = () => {
     }, [activeTab]);
 
     const cargarDatos = async () => {
-        // La pestaña 'implementacion' gestiona su propia carga de datos
         if (activeTab === 'implementacion') return;
 
         setIsLoading(true);
@@ -40,6 +52,8 @@ const PesvPage = () => {
             if (activeTab === 'conductores') {
                 const data = await getConductoresPESV();
                 setConductores(data);
+                setIsLoading(false); // Paramos carga aquí para retorno rápido
+                return data; // Retornamos data para el encadenamiento
             } 
             else if (activeTab === 'vehiculos') {
                 const allActivos = await getActivosTodos();
@@ -60,7 +74,8 @@ const PesvPage = () => {
         }
     };
 
-    // --- HELPERS ---
+    // --- HELPERS Y MANEJADORES ---
+
     const abrirEditarConductor = (c) => {
         setConductorSelected(c);
         setModalConductorOpen(true);
@@ -72,18 +87,64 @@ const PesvPage = () => {
         cargarDatos(); // Recargar tabla
     };
     
-    const handleMtoCreado = () => {
-        setModalMtoOpen(false);
-        cargarDatos(); // Recargar tabla
+    // Abrir modal de creación con datos pre-llenados
+    const abrirCrearUsuario = (c) => {
+        setUsuarioPrellenado({
+            NombreCompleto: c.NombreCompleto,
+            CedulaUsuario: c.CedulaUsuario,
+            Cargo: c.Cargo
+        });
+        setModalCrearUsuarioOpen(true);
     };
 
-    // Verificar si una fecha ya pasó (Vencido)
+    // Flujo Continuo: Crear Usuario -> Abrir Gestión Automáticamente
+    const handleUsuarioCreado = async (cedulaCreada) => {
+        setModalCrearUsuarioOpen(false);
+        setUsuarioPrellenado(null);
+
+        Swal.fire({
+            title: '¡Usuario Activado!',
+            text: 'Preparando formulario de licencia...',
+            icon: 'success',
+            timer: 1000,
+            showConfirmButton: false
+        });
+
+        // 1. Recargar datos frescos del backend
+        const listaActualizada = await cargarDatos();
+
+        // 2. Buscar al usuario recién creado
+        if (listaActualizada && cedulaCreada) {
+            const nuevoConductor = listaActualizada.find(c => c.CedulaUsuario === cedulaCreada);
+            
+            // 3. Abrir automáticamente el modal de gestión
+            if (nuevoConductor && nuevoConductor.ID_Usuario) {
+                setTimeout(() => {
+                    abrirEditarConductor(nuevoConductor);
+                }, 800);
+            }
+        }
+    };
+
+    const handleMtoCreado = () => {
+        setModalMtoOpen(false);
+        cargarDatos(); 
+    };
+
+    // Helper para verificar vencimientos
     const isVencido = (fechaISO) => {
         if (!fechaISO) return false;
-        // Comparar solo fechas sin hora para evitar falsos positivos del mismo día
         const fecha = new Date(fechaISO).setHours(0,0,0,0);
         const hoy = new Date().setHours(0,0,0,0);
         return fecha < hoy;
+    };
+
+    // Helper para abrir documento en pestaña nueva
+    const abrirDocumento = (ruta) => {
+        if (!ruta) return;
+        const rutaLimpia = ruta.replace(/\\/g, '/'); // Normalizar slashes
+        const urlCompleta = `${API_BASE_URL}/${rutaLimpia}`;
+        window.open(urlCompleta, '_blank');
     };
 
     return (
@@ -130,20 +191,24 @@ const PesvPage = () => {
             {/* --- CONTENIDO --- */}
             <div className="page-content-card">
                 
-                {/* TAB 1: IMPLEMENTACIÓN (Gestor de Pasos) */}
+                {/* TAB 1: IMPLEMENTACIÓN */}
                 {activeTab === 'implementacion' && <TabPasosPESV />}
 
                 {/* TAB 2: CONDUCTORES */}
                 {activeTab === 'conductores' && (
                     <>
-                        {isLoading ? <p>Cargando conductores...</p> : (
+                        {isLoading ? <p>Sincronizando con Nómina (Gosen)...</p> : (
                             <div className="table-wrapper">
+                                <div style={{marginBottom:'10px', fontSize:'0.85rem', color:'#666', backgroundColor:'#e7f3ff', padding:'10px', borderRadius:'6px', border:'1px solid #b6d4fe'}}>
+                                    <strong>ℹ️ Sincronización:</strong> Se visualizan colaboradores con cargos de <strong>Conductor, Chofer, Transportador y Maquinaria</strong>.
+                                </div>
                                 <table className="data-table">
                                     <thead>
                                         <tr>
+                                            <th>Estado</th>
                                             <th>Nombre</th>
                                             <th>Cédula</th>
-                                            <th>Cargo</th>
+                                            <th>Cargo (Nómina)</th>
                                             <th>Licencia</th>
                                             <th>Categoría</th>
                                             <th>Vencimiento</th>
@@ -151,9 +216,16 @@ const PesvPage = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {conductores.map(c => (
-                                            <tr key={c.ID_Usuario}>
-                                                <td>{c.NombreCompleto}</td>
+                                        {conductores.map((c, idx) => (
+                                            <tr key={idx}>
+                                                <td>
+                                                    {c.EstadoRegistro === 'Registrado' ? (
+                                                        <span className="status-pill status-activo">En Sistema</span>
+                                                    ) : (
+                                                        <span className="status-pill status-pendiente">Pendiente</span>
+                                                    )}
+                                                </td>
+                                                <td><strong>{c.NombreCompleto}</strong></td>
                                                 <td>{c.CedulaUsuario}</td>
                                                 <td>{c.Cargo}</td>
                                                 <td>{c.NumeroLicencia || '--'}</td>
@@ -165,10 +237,47 @@ const PesvPage = () => {
                                                         </span>
                                                     ) : <span style={{color:'#999'}}>--</span>}
                                                 </td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-secondary" onClick={() => abrirEditarConductor(c)}>
-                                                        <BsPencilSquare /> Gestionar
-                                                    </button>
+                                                <td style={{display: 'flex', gap: '5px'}}>
+                                                    {c.ID_Usuario ? (
+                                                        <>
+                                                            {/* BOTÓN GESTIONAR (Editar datos) */}
+                                                            <button 
+                                                                className="btn btn-sm btn-secondary" 
+                                                                onClick={() => abrirEditarConductor(c)}
+                                                                title="Editar datos de licencia"
+                                                            >
+                                                                <BsPencilSquare /> Gestionar
+                                                            </button>
+
+                                                            {/* BOTÓN VER DOCUMENTO (Solo si existe ruta) */}
+                                                            {c.RutaLicencia && (
+                                                                <button 
+                                                                    className="btn btn-sm"
+                                                                    onClick={() => abrirDocumento(c.RutaLicencia)}
+                                                                    title="Ver Licencia Adjunta"
+                                                                    style={{
+                                                                        backgroundColor: '#17a2b8', // Azul Cian
+                                                                        color: 'white', 
+                                                                        border: 'none',
+                                                                        display: 'flex', 
+                                                                        alignItems: 'center', 
+                                                                        justifyContent: 'center'
+                                                                    }}
+                                                                >
+                                                                    <BsEyeFill />
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        // BOTÓN CREAR USUARIO (Si no existe localmente)
+                                                        <button 
+                                                            className="btn btn-sm btn-primary" 
+                                                            onClick={() => abrirCrearUsuario(c)}
+                                                            title="Habilitar usuario en el sistema"
+                                                        >
+                                                            <BsPersonPlusFill /> Crear Usuario
+                                                        </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
@@ -179,7 +288,7 @@ const PesvPage = () => {
                     </>
                 )}
 
-                {/* TAB 3: VEHÍCULOS (Resumen) */}
+                {/* TAB 3: VEHÍCULOS */}
                 {activeTab === 'vehiculos' && (
                     <>
                         {isLoading ? <p>Cargando flota...</p> : (
@@ -290,6 +399,14 @@ const PesvPage = () => {
                     vehiculos={vehiculos} 
                     alCerrar={() => setModalMtoOpen(false)} 
                     alExito={handleMtoCreado} 
+                />
+            )}
+
+            {modalCrearUsuarioOpen && (
+                <ModalCrearUsuario 
+                    alCerrar={() => setModalCrearUsuarioOpen(false)} 
+                    alExito={handleUsuarioCreado} 
+                    initialData={usuarioPrellenado} 
                 />
             )}
         </div>

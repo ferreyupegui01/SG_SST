@@ -1,6 +1,8 @@
+// frontend/src/pages/InspeccionesPage.jsx
+
 import React, { useState, useEffect, useMemo } from 'react';
 
-// IMPORTAMOS TAMBIÉN getPreguntasFormulario
+// Servicios
 import { 
     getInspeccionesHistorial, 
     getFormularios, 
@@ -10,7 +12,8 @@ import {
 import '../index.css';
 import '../style/InspeccionesPage.css';
 
-import { BsPlusLg, BsEyeFill, BsFileEarmarkPlus, BsSearch } from 'react-icons/bs';
+// Iconos (Quitamos BsFileEarmarkPlus que ya no se usa)
+import { BsPlusLg, BsEyeFill, BsSearch } from 'react-icons/bs';
 import Swal from 'sweetalert2'; 
 
 // Modales
@@ -18,7 +21,6 @@ import ModalVerInspeccion from '../components/ModalVerInspeccion.jsx';
 import ModalDiligenciarInspeccion from '../components/ModalDiligenciarInspeccion.jsx';
 import ModalCrearACPM from '../components/ModalCrearACPM.jsx'; 
 import ModalVerACPM from '../components/ModalVerACPM.jsx'; 
-import ModalCrearFormulario from '../components/ModalCrearFormulario.jsx';
 
 const InspeccionesPage = () => {
 
@@ -28,7 +30,7 @@ const InspeccionesPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // --- FILTROS (NUEVO) ---
+    // --- FILTROS ---
     const [busqueda, setBusqueda] = useState('');
     const [filtroResultado, setFiltroResultado] = useState(''); // 'OK', 'Con Hallazgos'
 
@@ -46,9 +48,6 @@ const InspeccionesPage = () => {
     const [modalCrearAcpmAbierto, setModalCrearAcpmAbierto] = useState(false);
     const [modalVerAcpmId, setModalVerAcpmId] = useState(null);
     const [acpmInitialData, setAcpmInitialData] = useState({});
-
-    // Crear Formulario
-    const [modalCrearFormularioAbierto, setModalCrearFormularioAbierto] = useState(false);
 
     // CARGA INICIAL
     const cargarDatos = async () => {
@@ -70,7 +69,7 @@ const InspeccionesPage = () => {
 
     useEffect(() => { cargarDatos(); }, []);
 
-    // --- LÓGICA DE FILTRADO (NUEVO) ---
+    // --- LÓGICA DE FILTRADO ---
     const historialFiltrado = useMemo(() => {
         return historial.filter(ins => {
             const texto = busqueda.toLowerCase();
@@ -104,7 +103,7 @@ const InspeccionesPage = () => {
         setFormularioSeleccionado(form);
         setPreguntasFormulario([]);
 
-        // Formularios hardcoded que NO usan BD
+        // Formularios hardcoded que NO usan BD (Legacy)
         const formulariosHardcoded = [
             'FTO-SST-02', 'FTO-SST-13', 'FTO-SST-14',
             'FTO-SST-23', 'FTO-SST-45', 'FTO-SST-95', 'FTO-SST-96'
@@ -117,6 +116,7 @@ const InspeccionesPage = () => {
                 setPreguntasFormulario(preguntas);
             // eslint-disable-next-line no-unused-vars
             } catch (err) {
+                // eslint-disable-next-line no-unused-vars
                 Swal.fire('Error', 'No se pudieron cargar las preguntas del formulario dinámico.', 'error');
                 return;
             }
@@ -169,12 +169,6 @@ const InspeccionesPage = () => {
     const abrirModalVerACPM = (id) => setModalVerAcpmId(id);
     const cerrarModalVerACPM = () => setModalVerAcpmId(null);
 
-    // CREAR FORMULARIO
-    const handleFormularioCreado = () => {
-        setModalCrearFormularioAbierto(false);
-        cargarDatos();
-    };
-
     // UTIL FECHA
     const formatearFechaHora = (fechaISO) => {
         if (!fechaISO) return 'N/A';
@@ -187,12 +181,7 @@ const InspeccionesPage = () => {
             {/* HEADER */}
             <div className="page-header">
                 <h1>Inspecciones de Seguridad</h1>
-                <button 
-                    className="btn btn-secondary" 
-                    onClick={() => setModalCrearFormularioAbierto(true)}
-                >
-                    <BsFileEarmarkPlus /> Crear Nuevo Formulario
-                </button>
+                {/* BOTÓN ELIMINADO AQUÍ */}
             </div>
 
             {/* BIBLIOTECA */}
@@ -222,7 +211,7 @@ const InspeccionesPage = () => {
             <div className="page-content-card" style={{ marginTop: '2rem' }}>
                 <h2>Historial de Inspecciones Realizadas</h2>
 
-                {/* --- BARRA DE FILTROS (NUEVA) --- */}
+                {/* --- BARRA DE FILTROS --- */}
                 <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                     {/* Input Búsqueda */}
                     <div className="search-input-container" style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
@@ -353,13 +342,6 @@ const InspeccionesPage = () => {
                 <ModalVerACPM 
                     acpmId={modalVerAcpmId}
                     alCerrar={cerrarModalVerACPM}
-                />
-            )}
-
-            {modalCrearFormularioAbierto && (
-                <ModalCrearFormulario 
-                    alCerrar={() => setModalCrearFormularioAbierto(false)}
-                    alExito={handleFormularioCreado}
                 />
             )}
 

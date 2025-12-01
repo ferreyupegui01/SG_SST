@@ -1,4 +1,5 @@
-// backend/src/routes/userRoutes.js
+// backend/routes/userRoutes.js
+
 import express from 'express';
 import { check } from 'express-validator';
 import userController from '../controllers/userController.js';
@@ -6,14 +7,29 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// --- RUTA NUEVA PARA API EXTERNA (ANTES DE LOS IDs) ---
+// 1. RUTA PARA API EXTERNA (GOSEN)
 router.get(
     '/externos/buscar', 
     [ protect, admin ], 
     userController.buscarDirectorioExterno
 );
 
-// POST /api/usuarios (Crear)
+// 2. OBTENER ROLES
+router.get(
+    '/roles',
+    [ protect, admin ],
+    userController.getRoles
+);
+
+// 3. OBTENER CARGOS (NUEVA RUTA)
+// IMPORTANTE: Debe ir antes de las rutas con :id para no confundirse
+router.get(
+    '/cargos',
+    [ protect, admin ],
+    userController.getCargosEmpresa
+);
+
+// 4. CREAR USUARIO
 router.post(
     '/',
     [ protect, admin ],
@@ -26,35 +42,28 @@ router.post(
     userController.crearColaborador
 );
 
-// GET /api/usuarios (Lista gestión)
+// 5. LISTAR USUARIOS (Gestión)
 router.get(
     '/',
     [ protect, admin ],
     userController.getColaboradores
 );
 
-// GET /api/usuarios/todos (Lista selectores)
+// 6. LISTAR TODOS (Selectores)
 router.get(
     '/todos',
     [ protect, admin ], 
     userController.getTodosUsuarios
 );
 
-// Obtener Roles
-router.get(
-    '/roles',
-    [ protect, admin ],
-    userController.getRoles
-);
-
-// Obtener por Cédula
+// 7. OBTENER POR CÉDULA
 router.get(
     '/cedula/:cedula',
     [ protect, admin ],
     userController.getUsuarioPorCedula
 );
 
-// PUT /api/usuarios/:id (Editar)
+// 8. EDITAR USUARIO
 router.put(
     '/:id', 
     [ protect, admin ],
@@ -64,7 +73,7 @@ router.put(
     userController.editarColaborador
 );
 
-// PATCH /api/usuarios/:id/estado (Activar/Inactivar)
+// 9. CAMBIAR ESTADO (ACTIVAR/INACTIVAR)
 router.patch(
     '/:id/estado',
     [ protect, admin ],
@@ -74,7 +83,7 @@ router.patch(
     userController.cambiarEstadoColaborador
 );
 
-// PATCH /api/usuarios/:id/reset-password (Resetear)
+// 10. RESETEAR PASSWORD
 router.patch(
     '/:id/reset-password',
     [ protect, admin ],
