@@ -13,15 +13,60 @@ const buscarDirectorioExterno = async (req, res) => {
     try {
         const resultados = await buscarEnDirectorioExterno(query);
         
-        // Mapeamos los datos para el frontend
-        const datosFormateados = resultados.map(u => ({
-            Nombre: u.NombreCompleto,
-            Cedula: u.Cedula,
-            // Usamos el nombre real del cargo que viene de Gosen
-            Cargo: u.CargoNombre || 'Sin asignar',
-            Area: u.AreaID ? `Centro Op. ${u.AreaID}` : 'Operaciones',
-            Email: u.Email || 'No registrado'
-        }));
+        // DEBUG: Descomenta esto si sigues teniendo problemas para ver qué llega
+        // if(resultados.length > 0) console.log("Estado Raw del primero:", resultados[0].EstadoContrato);
+
+        const datosFormateados = resultados.map(u => {
+            
+            // 1. DETECCIÓN DE ESTADO (Más permisiva)
+            const estadoRaw = u.EstadoContrato;
+            // Consideramos activo si es el número 1, el string "1" o true booleano
+            const esActivo = (estadoRaw == 1 || estadoRaw === true || String(estadoRaw).trim() === '1');
+
+            // Helper para fecha
+            const formatearFecha = (f) => {
+                if (!f) return null;
+                const fechaObj = new Date(f);
+                if (isNaN(fechaObj.getTime())) return null;
+                // Sumar 5 horas para compensar UTC si es necesario
+                const userTimezoneOffset = fechaObj.getTimezoneOffset() * 60000;
+                const fechaCompensada = new Date(fechaObj.getTime() + userTimezoneOffset);
+                return fechaCompensada.toLocaleDateString('es-CO');
+            };
+
+            const fechaInicioStr = formatearFecha(u.FechaInicio);
+            const fechaFinStr = formatearFecha(u.FechaFin);
+            const fechaTerminacionStr = formatearFecha(u.FechaTerminacion);
+
+            // 2. LÓGICA DE FECHAS (Según tu requerimiento)
+            let textoFecha = '---';
+
+            if (esActivo) {
+                // CASO ACTIVO: SIEMPRE FECHA INICIO
+                textoFecha = fechaInicioStr ? `Inicio: ${fechaInicioStr}` : 'Activo (Sin fecha inicio)';
+            } else {
+                // CASO INACTIVO: FECHA FIN (Preferimos Terminación real, si no Fin Contrato)
+                if (fechaTerminacionStr) {
+                    textoFecha = `Fin: ${fechaTerminacionStr}`;
+                } else if (fechaFinStr) {
+                    textoFecha = `Fin: ${fechaFinStr}`;
+                } else {
+                    textoFecha = 'Inactivo (Sin fecha fin)';
+                }
+            }
+
+            return {
+                Nombre: u.NombreCompleto,
+                Cedula: u.Cedula,
+                Cargo: u.CargoNombre || 'Sin asignar',
+                Area: u.CentroCosto || 'No definido', // Aquí va el nombre del Centro de Costo
+                Email: u.Email || 'No registrado',
+                
+                // Estos campos los usa el Frontend para pintar verde/rojo
+                Estado: esActivo ? 'Activo' : 'Inactivo',
+                FechaRelevante: textoFecha
+            };
+        });
 
         res.json(datosFormateados);
 
@@ -180,12 +225,10 @@ const resetPasswordColaborador = async (req, res) => {
     }
 };
 
-// --- NUEVA FUNCIÓN: OBTENER CARGOS DE DB ---
 const getCargosEmpresa = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query('EXEC SP_GET_CargosEmpresa');
-        // Transformamos el recordset en un array simple de strings
         const lista = result.recordset.map(item => item.NombreCargo);
         res.json(lista);
     } catch (err) {
@@ -204,7 +247,7 @@ const userController = {
     editarColaborador,
     cambiarEstadoColaborador,
     resetPasswordColaborador,
-    getCargosEmpresa // <--- EXPORTADA
+    getCargosEmpresa
 };
 
 export default userController;

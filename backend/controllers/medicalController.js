@@ -5,6 +5,7 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs'; // Asegúrate de importar fs
 import { logAction } from '../services/logService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +33,6 @@ const crearExamenMedico = async (req, res) => {
         tipoExamen, fechaExamen, conceptoAptitud,
         recomendacionesGenerales, observaciones, recomendacionesOcupacionales, 
         medicoEspecialista, entidadEmite, resumenCaso, compromisos,
-        // Usamos la fecha en lugar de la duración texto
         fechaFinRecomendaciones 
     } = req.body;
     
@@ -55,11 +55,7 @@ const crearExamenMedico = async (req, res) => {
             .input('entidadEmite', mssql.NVarChar, entidadEmite || null)
             .input('resumenCaso', mssql.NVarChar, resumenCaso || null)
             .input('compromisos', mssql.NVarChar, compromisos || null)
-            
-            // Enviamos la fecha al SP
             .input('fechaFinRecomendaciones', mssql.Date, fechaFinRecomendaciones || null)
-            
-            // Nota: Quitamos @duracionRecomendaciones porque ya no existe en la tabla
             .query('EXEC SP_CREATE_ExamenMedico @idUsuarioColaborador, @idUsuarioAdminRegistra, @tipoExamen, @fechaExamen, @conceptoAptitud, @recomendacionesGenerales, @observaciones, @recomendacionesOcupacionales, @medicoEspecialista, @entidadEmite, @fechaFinRecomendaciones, @resumenCaso, @compromisos, @nombreColaborador, @cedulaColaborador');
 
         await logAction(req.usuario.id, req.usuario.nombre, 'CREAR_EXAMEN', `Registró examen para: ${nombreColaborador}`);
@@ -86,9 +82,13 @@ const getExamenMedicoDetalle = async (req, res) => {
     }
 };
 
-// --- GENERAR PDF (ESTRUCTURA ORIGINAL RESTAURADA) ---
+// --- GENERAR PDF CON NUEVO ENCABEZADO (ACTUALIZADO) ---
 const generarPdfRecomendaciones = async (req, res) => {
     const { id } = req.params;
+    
+    // Recibimos los datos del encabezado desde el body (POST)
+    const { codigo, version, fechaEmision, fechaRevision } = req.body;
+
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -101,92 +101,114 @@ const generarPdfRecomendaciones = async (req, res) => {
 
         const data = result.recordset[0];
         
-        // 1. Configuración Documento
-        const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+        // Configuración Documento
+        const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true }); // Margen ajustado a 40 para coincidir
         const filename = `Recomendaciones-${data.CedulaColaborador || 'NA'}.pdf`;
+        
+        // Headers para descarga directa
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         doc.pipe(res);
 
-        const startX = 50;
-        let y = 40; 
+        const fontBold = 'Helvetica-Bold';
+        const fontReg = 'Helvetica';
+        const black = '#000000';
 
-        // === LOGO ===
+        // ==========================================
+        // 1. ENCABEZADO ESTRUCTURADO (TABLA)
+        // ==========================================
+        const startY = 40; 
+        const startX = 40;
+        const col1W = 100; // Logo
+        const col2W = 280; // Título
+        const col3W = 150; // Datos Control
+        const hHeader = 70;
+
+        // Bordes Tabla
+        doc.rect(startX, startY, col1W + col2W + col3W, hHeader).stroke();
+        doc.moveTo(startX + col1W, startY).lineTo(startX + col1W, startY + hHeader).stroke();
+        doc.moveTo(startX + col1W + col2W, startY).lineTo(startX + col1W + col2W, startY + hHeader).stroke();
+        
+        const rowH = hHeader / 4;
+        doc.moveTo(startX + col1W + col2W, startY + rowH).lineTo(startX + col1W + col2W + col3W, startY + rowH).stroke();
+        doc.moveTo(startX + col1W + col2W, startY + rowH * 2).lineTo(startX + col1W + col2W + col3W, startY + rowH * 2).stroke();
+        doc.moveTo(startX + col1W + col2W, startY + rowH * 3).lineTo(startX + col1W + col2W + col3W, startY + rowH * 3).stroke();
+
+        // --- LOGO ---
         const logoPath = path.resolve(__dirname, '..', 'assets', 'logo.png');
-        let logoHeight = 0;
-        try {
-            doc.image(logoPath, 60, 10, { width: 120 });
-            logoHeight = 60;
-        } catch {
-            doc.font('Helvetica-Bold').text('EMPRESA', startX, y);
-            logoHeight = 20;
+        if (fs.existsSync(logoPath)) {
+            try { doc.image(logoPath, startX + 10, startY + 4, { width: 80 }); } 
+            catch (e) { console.warn('Logo error', e); }
         }
 
-        // === ENCABEZADO ===
-        const headerX = startX + 120;
-        const headerWidth = 390;
+        // --- TÍTULO CENTRAL ---
+        // Título Principal del Sistema
+        doc.font(fontBold).fontSize(10).fillColor(black)
+           .text('SISTEMA DE GESTIÓN DE SEGURIDAD Y SALUD EN EL TRABAJO (SG-SST)', startX + col1W, startY + 18, { width: col2W, align: 'center' });
         
-        doc.font('Helvetica-Bold').fontSize(14).fillColor('#000000')
-           .text('Acta de notificación de restricciones y/o recomendaciones médicas',
-               headerX, y + 5, { align: 'center', width: headerWidth });
-        
-        doc.moveDown(0.3);
-        
-        // Guardar Y para paginación
-        const subtitleY = doc.y; 
-        doc.fontSize(9);
-        doc.moveDown(1); 
+        // Título del Documento Específico
+        doc.font(fontBold).fontSize(10)
+           .text('ACTA DE NOTIFICACIÓN DE RECOMENDACIONES MÉDICAS', startX + col1W, startY + 42, { width: col2W, align: 'center' });
 
-        doc.moveDown(2);
-        doc.y = y + logoHeight + 30;
-        doc.fillColor('#000000'); 
+        // --- DATOS DE CONTROL (DERECHA) ---
+        doc.font(fontBold).fontSize(8);
+        doc.text(`CÓDIGO: ${codigo || 'SST-FTO-001'}`, startX + col1W + col2W + 5, startY + 7);
+        doc.text(`FECHA EMISIÓN: ${fechaEmision || ''}`, startX + col1W + col2W + 5, startY + rowH + 7);
+        doc.text(`FECHA REVISIÓN: ${fechaRevision || ''}`, startX + col1W + col2W + 5, startY + (rowH * 2) + 7);
+        doc.text(`VERSIÓN: ${version || '1'}`, startX + col1W + col2W + 5, startY + (rowH * 3) + 7);
 
-        // Función Helper Original
+        // ==========================================
+        // 2. CUERPO DEL DOCUMENTO
+        // ==========================================
+        
+        // Resetear cursor debajo del encabezado
+        doc.x = startX;
+        doc.y = startY + hHeader + 40;
+        
+        const contentWidth = 530; // Ancho útil
+
         const seccion = (titulo) => {
             doc.moveDown(1);
-            doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000')
-                .text(titulo.toUpperCase(), startX);
+            doc.font(fontBold).fontSize(11).fillColor(black)
+                .text(titulo.toUpperCase());
             doc.moveDown(0.4);
-            doc.font('Helvetica').fontSize(10).fillColor('#000000');
+            doc.font(fontReg).fontSize(10).fillColor(black);
         };
 
-        // === DATOS (Estructura Original) ===
-        let contentX = 50;
-        let contentY = doc.y;
-        doc.y = contentY;
-
-        seccion("Datos del colaborador");
-        doc.text(`Nombre: ${data.NombreColaborador || ''}`, contentX);
-        doc.text(`C.C: ${data.CedulaColaborador || ''}`, contentX);
+        // --- DATOS DEL COLABORADOR ---
+        doc.font(fontBold).text("DATOS GENERALES:", { underline: true });
+        doc.moveDown(0.5);
         
         const fechaExamenStr = data.FechaExamen ? new Date(data.FechaExamen).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : 'N/A';
-        doc.text(`Fecha del Examen: ${fechaExamenStr}`, contentX);
-        
-        doc.text(`Tipo de Examen: ${data.TipoExamen || ''}`, contentX);
-        doc.text(`Concepto de Aptitud: ${data.ConceptoAptitud || ''}`, contentX);
-
-        seccion("Información del concepto");
-        doc.text(`Persona que emite el concepto (Médico): ${data.MedicoEspecialista || 'No registra'}`, contentX);
-        doc.text(`Entidad que emite el concepto (ARL/EPS): ${data.EntidadEmite || 'No registra'}`, contentX);
-        
-        // CAMBIO AQUÍ: Usamos la fecha en vez del texto de duración
         let fechaFinStr = 'Indefinida / No aplica';
         if (data.FechaFinRecomendaciones) {
             fechaFinStr = new Date(data.FechaFinRecomendaciones).toLocaleDateString('es-CO', { timeZone: 'UTC' });
         }
-        doc.text(`Fecha de terminación de recomendaciones: ${fechaFinStr}`, contentX);
+
+        // Tabla visual simulada con tabulaciones
+        doc.font(fontBold).fontSize(10);
+        doc.text(`Nombre: `, { continued: true }); doc.font(fontReg).text(data.NombreColaborador);
+        doc.font(fontBold).text(`Cédula: `, { continued: true }); doc.font(fontReg).text(data.CedulaColaborador);
+        doc.font(fontBold).text(`Fecha del Examen: `, { continued: true }); doc.font(fontReg).text(fechaExamenStr);
+        doc.font(fontBold).text(`Tipo de Examen: `, { continued: true }); doc.font(fontReg).text(data.TipoExamen);
+        doc.font(fontBold).text(`Concepto: `, { continued: true }); doc.font(fontReg).text(data.ConceptoAptitud);
+        
+        doc.moveDown(0.5);
+        doc.font(fontBold).text(`Médico Emisor: `, { continued: true }); doc.font(fontReg).text(data.MedicoEspecialista || 'No registra');
+        doc.font(fontBold).text(`Entidad (EPS/ARL): `, { continued: true }); doc.font(fontReg).text(data.EntidadEmite || 'No registra');
+        doc.font(fontBold).text(`Vigencia Recomendaciones: `, { continued: true }); doc.font(fontReg).text(fechaFinStr);
 
         seccion("Temas tratados: breve resumen del caso");
-        doc.text(data.ResumenCaso || 'No se registró un resumen del caso.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.ResumenCaso || 'No se registró un resumen del caso.', { width: contentWidth, align: 'justify' });
 
         seccion("Ampliación de las recomendaciones médicas (no ocupacionales)");
-        doc.text(data.RecomendacionesGenerales || 'Sin recomendaciones médicas generales.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.RecomendacionesGenerales || 'Sin recomendaciones médicas generales.', { width: contentWidth, align: 'justify' });
 
         seccion("Recomendaciones ocupacionales (para el trabajo)");
-        doc.text(data.RecomendacionesOcupacionales || 'Sin recomendaciones ocupacionales específicas.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.RecomendacionesOcupacionales || 'Sin recomendaciones ocupacionales específicas.', { width: contentWidth, align: 'justify' });
 
         seccion("Compromisos");
-        doc.text(data.Compromisos || 'Sin compromisos registrados.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.Compromisos || 'Sin compromisos registrados.', { width: contentWidth, align: 'justify' });
 
         // === FIRMAS ===
         if (doc.y > 600) doc.addPage(); 
@@ -194,13 +216,13 @@ const generarPdfRecomendaciones = async (req, res) => {
         doc.moveDown(4);
         seccion("En constancia de lo anterior se firma por parte de los asistentes:");
         doc.moveDown(3);
-        doc.font('Helvetica').fontSize(10);
+        doc.font(fontReg).fontSize(10);
         
-        doc.text('___________________________________', contentX);
-        doc.text('Nombre:', contentX);
-        doc.text('Cargo/Empresa:', contentX);
-        doc.text('N° Identificación:', contentX);
-        doc.text('Firma:', contentX);
+        doc.text('___________________________________');
+        doc.text('Nombre:');
+        doc.text('Cargo/Empresa:');
+        doc.text('N° Identificación:');
+        doc.text('Firma:');
 
         // === NUMERACIÓN DE PÁGINAS ===
         const range = doc.bufferedPageRange();
@@ -208,18 +230,10 @@ const generarPdfRecomendaciones = async (req, res) => {
 
         for (let i = 0; i < totalPages; i++) {
             doc.switchToPage(i);
-            if (i === 0) {
-                const fechaEmision = new Date().toLocaleDateString('es-CO');
-                doc.font('Helvetica').fontSize(9).fillColor('#6c757d')
-                   .text(
-                       `Fecha Emisión: ${fechaEmision}    Fecha Revisión: ${fechaEmision}    Páginas: ${i + 1} de ${totalPages}`,
-                       headerX, subtitleY, { align: 'center', width: headerWidth }
-                   );
-            } else {
-                doc.font('Helvetica').fontSize(9).fillColor('#6c757d')
-                   .text(`Página ${i + 1} de ${totalPages}`, 50, 30, { align: 'right' });
-            }
+            doc.fontSize(8).fillColor('#6c757d')
+               .text(`Página ${i + 1} de ${totalPages}`, 0, 730, { align: 'center', width: 612 });
         }
+        
         doc.end();
 
     } catch (err) {

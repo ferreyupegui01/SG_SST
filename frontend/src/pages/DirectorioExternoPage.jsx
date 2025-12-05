@@ -4,7 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { buscarUsuarioExterno } from '../services/userService';
 import '../index.css';
 // Importamos iconos
-import { BsSearch, BsBuilding, BsPersonBadge, BsEnvelope, BsBriefcaseFill, BsFolderPlus } from 'react-icons/bs';
+import { 
+    BsSearch, BsBuilding, BsPersonBadge, BsEnvelope, 
+    BsBriefcaseFill, BsFolderPlus, BsCalendarEvent, BsDot 
+} from 'react-icons/bs';
 // IMPORTAMOS EL MODAL DE DOCUMENTOS
 import ModalGestionarDocs from '../components/ModalGestionarDocs';
 
@@ -70,9 +73,9 @@ const DirectorioExternoPage = () => {
                                     <th>Colaborador</th>
                                     <th>Identificación</th>
                                     <th>Cargo (Oficio)</th>
-                                    <th>Área / Centro Costo</th>
-                                    <th>Contacto</th>
-                                    <th>Gestión</th> {/* NUEVA COLUMNA */}
+                                    <th>Centro de Costos</th>
+                                    <th>Estado / Fecha</th> 
+                                    <th>Gestión</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -80,13 +83,20 @@ const DirectorioExternoPage = () => {
                                     <tr><td colSpan="6" style={{textAlign:'center', padding:'2rem', color:'#999'}}>No se encontraron colaboradores.</td></tr>
                                 ) : (
                                     empleados.map((emp, idx) => (
-                                        <tr key={idx}>
+                                        <tr key={idx} style={{opacity: emp.Estado === 'Inactivo' ? 0.7 : 1}}>
+                                            {/* 1. NOMBRE */}
                                             <td>
                                                 <div style={{fontWeight:'bold', color:'#005A5B', fontSize:'0.95rem'}}>
                                                     {emp.Nombre}
                                                 </div>
+                                                {emp.Email && emp.Email !== 'No registrado' && (
+                                                    <div style={{fontSize:'0.75rem', color:'#666', display:'flex', alignItems:'center'}}>
+                                                        <BsEnvelope style={{marginRight:'4px'}}/> {emp.Email}
+                                                    </div>
+                                                )}
                                             </td>
 
+                                            {/* 2. CÉDULA */}
                                             <td>
                                                 <div style={{display:'flex', alignItems:'center', gap:'6px', color:'#333'}}>
                                                     <BsPersonBadge style={{color:'#6c757d'}}/> 
@@ -94,6 +104,7 @@ const DirectorioExternoPage = () => {
                                                 </div>
                                             </td>
                                             
+                                            {/* 3. CARGO */}
                                             <td>
                                                 <div style={{
                                                     display:'flex', alignItems:'center', gap:'6px', 
@@ -105,25 +116,36 @@ const DirectorioExternoPage = () => {
                                                 </div>
                                             </td>
 
+                                            {/* 4. CENTRO DE COSTOS */}
                                             <td>
                                                 <div style={{display:'flex', alignItems:'center', gap:'6px', color:'#666', fontSize:'0.9rem'}}>
                                                     <BsBuilding /> {emp.Area}
                                                 </div>
                                             </td>
 
+                                            {/* 5. ESTADO Y FECHA */}
                                             <td>
-                                                {emp.Email && emp.Email !== 'No registrado' ? (
-                                                    <span style={{display:'flex', alignItems:'center', gap:'5px', color:'#007BFF', fontSize:'0.85rem'}}>
-                                                        <BsEnvelope /> {emp.Email}
+                                                <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                                                    <span 
+                                                        className={`status-pill ${emp.Estado === 'Activo' ? 'status-activo' : 'status-inactivo'}`}
+                                                        style={{width: 'fit-content', fontSize:'0.75rem'}}
+                                                    >
+                                                        <BsDot style={{fontSize:'1.2rem', marginLeft:'-5px'}}/>
+                                                        {emp.Estado}
                                                     </span>
-                                                ) : <span style={{color:'#adb5bd', fontSize:'0.8rem'}}>--</span>}
+                                                    
+                                                    <div style={{fontSize:'0.8rem', color:'#555', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                        <BsCalendarEvent style={{color:'#6c757d'}}/> 
+                                                        {emp.FechaRelevante}
+                                                    </div>
+                                                </div>
                                             </td>
 
-                                            {/* BOTÓN DE DOCUMENTOS */}
+                                            {/* 6. BOTÓN DE DOCUMENTOS */}
                                             <td>
                                                 <button 
                                                     className="btn btn-sm btn-secondary" 
-                                                    onClick={() => setColaboradorDocs(emp)} // Abrimos el modal con este empleado
+                                                    onClick={() => setColaboradorDocs(emp)} 
                                                     title="Gestionar Documentos Adjuntos"
                                                     style={{display:'flex', alignItems:'center', gap:'5px'}}
                                                 >
@@ -139,7 +161,7 @@ const DirectorioExternoPage = () => {
                 </div>
                 
                 <div style={{marginTop:'1.5rem', fontSize:'0.75rem', color:'#888', textAlign:'center', borderTop:'1px solid #eee', paddingTop:'10px'}}>
-                    Información sincronizada en tiempo real con la Base de Datos de Gosen.
+                    Información sincronizada en tiempo real con la Base de Datos de Nómina.
                 </div>
             </div>
 

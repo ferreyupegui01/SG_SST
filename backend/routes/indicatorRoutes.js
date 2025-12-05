@@ -5,10 +5,14 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Guardar indicador (Solo Admin SST/Super Admin)
 router.post('/', [protect, admin], indicatorController.guardarIndicador);
-
-// Obtener indicadores de un año
 router.get('/:anio', [protect, admin], indicatorController.getIndicadoresAnuales);
+router.delete('/registro/:id', [protect, admin], indicatorController.eliminarRegistro);
+
+// Rutas de Configuración
+router.get('/config/todos', [protect, admin], indicatorController.getConfiguraciones);
+router.post('/config', [protect, admin], indicatorController.crearConfiguracion);
+router.put('/config/:id', [protect, admin], indicatorController.editarConfiguracion); // <--- NUEVA RUTA
+router.delete('/config/:id', [protect, admin], indicatorController.eliminarConfiguracion);
 
 export default router;

@@ -5,11 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Header.css';
 import { useNavigate } from 'react-router-dom';
 import logo from "../assets/logo-empaquetados.png";
+import { BsList } from 'react-icons/bs'; // Icono de hamburguesa
 
 // Importamos el componente de Campana
 import NotificationBell from './NotificationBell'; 
 
-const Header = () => {
+const Header = ({ onToggleSidebar }) => { // Recibimos la función del Layout
     const { usuario, logout } = useAuth();
     const navigate = useNavigate();
 
@@ -18,31 +19,47 @@ const Header = () => {
         navigate('/login');
     };
 
+    // Verificamos si es Colaborador
+    const esColaborador = usuario?.rol === 'Colaborador';
+
     return (
         <header className="header-container">
             
-            {/* --- LOGO RECUPERADO --- */}
-            {/* Se usa la clase 'sidebar-logo-img3' que ya tienes en Header.css con posición absoluta */}
-            <img src={logo} alt="Logo Empaquetados El Trece" className="sidebar-logo-img3"/>
+            {/* --- BOTÓN HAMBURGUESA (Visible solo en Móvil/Tablet) --- */}
+            {/* Solo se muestra si NO es colaborador (porque el colaborador no tiene sidebar) */}
+            {!esColaborador && (
+                <button className="header-toggle-btn" onClick={onToggleSidebar}>
+                    <BsList />
+                </button>
+            )}
 
-            {/* Placeholder izquierdo */}
+            {/* --- LOGO (SOLO VISIBLE PARA COLABORADOR) --- */}
+            {esColaborador && (
+                <img 
+                    src={logo} 
+                    alt="Logo Empaquetados El Trece" 
+                    className="sidebar-logo-img3"
+                />
+            )}
+
+            {/* Placeholder flexible para empujar el contenido a la derecha */}
             <div className="header-title-placeholder"></div>
-            
+       
             {/* --- Sección Derecha: Usuario y Notificaciones --- */}
             <div className="header-user-info">
                 
                 {/* 1. CAMPANA DE NOTIFICACIONES */}
                 <NotificationBell />
                 
-                {/* Separador vertical sutil */}
-                <div style={{width:'1px', height:'25px', background:'#dee2e6', margin:'0 1rem'}}></div>
+                {/* Separador vertical */}
+                <div className="header-separator"></div>
 
                 {/* 2. Información del Usuario */}
-                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: '0.8rem'}}>
-                    <span style={{fontSize: '0.9rem', fontWeight: '600', color: '#333'}}>
+                <div className="user-details">
+                    <span className="user-name">
                         {usuario ? usuario.nombre : 'Usuario'}
                     </span>
-                    <span style={{fontSize: '0.75rem', color: '#6c757d'}}>
+                    <span className="user-role">
                         {usuario ? usuario.rol : ''}
                     </span>
                 </div>
@@ -53,7 +70,8 @@ const Header = () => {
                 
                 {/* 3. Botón Cerrar Sesión */}
                 <button onClick={handleLogout} className="header-logout-button">
-                    Cerrar Sesión
+                    <span className="logout-text">Cerrar Sesión</span>
+                    <span className="logout-icon">⏻</span>
                 </button>
             </div>
         </header>

@@ -2,7 +2,7 @@
 
 import { poolPromise, mssql } from '../config/dbConfig.js';
 import { generarActaPDF } from '../utils/pdfGenerator.js';
-import { obtenerConductoresGosen } from '../services/externalApiService.js'; // Servicio de integración
+import { obtenerConductoresGosen } from '../services/externalApiService.js'; 
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -63,61 +63,45 @@ const reemplazarEvidencia = async (req, res) => {
 const getConductoresPESV = async (req, res) => {
     try {
         // A. Obtener listado maestro de la API Externa (Gosen)
-        // Trae a todos los activos con cargo de Conductor, Chofer, Montacarguista, etc.
         const conductoresExternos = await obtenerConductoresGosen();
 
-        // B. Obtener datos locales (Todos los usuarios activos con info de licencia)
-        // Usamos el SP corregido que NO filtra por cargo para encontrar coincidencias por cédula
+        // B. Obtener datos locales
         const pool = await poolPromise;
         const resultLocal = await pool.request().query('EXEC SP_GET_ConductoresPESV');
         const conductoresLocales = resultLocal.recordset;
 
-        // C. Cruzar información (Merge con Prioridad Local)
+        // C. Cruzar información
         const listaUnificada = conductoresExternos.map(externo => {
-            
-            // Validación estricta de Cédula (Strings sin espacios)
             const cedulaExterna = String(externo.Cedula).trim();
-            
             const localData = conductoresLocales.find(local => 
                 String(local.CedulaUsuario).trim() === cedulaExterna
             );
 
             if (localData) {
-                // CASO 1: EL USUARIO YA EXISTE LOCALMENTE
-                // Se habilitará el botón "Gestionar" porque tenemos ID_Usuario
+                // EXISTE LOCALMENTE
                 return {
-                    // Datos Visuales (Preferimos Gosen por estar actualizados)
                     NombreCompleto: externo.NombreCompleto,
                     CedulaUsuario: externo.Cedula,
                     Cargo: externo.CargoNombre || localData.Cargo, 
-                    
-                    // Datos de Gestión (Vienen EXCLUSIVAMENTE de la BD Local)
                     ID_Usuario: localData.ID_Usuario, 
                     NumeroLicencia: localData.NumeroLicencia,
                     Categoria: localData.Categoria,
                     VencimientoLicencia: localData.VencimientoLicencia,
-                    
-                    // --- IMPORTANTE: Ruta del archivo para ver/descargar ---
                     RutaLicencia: localData.RutaLicencia, 
-                    
-                    // Estado para el Frontend
                     EstadoRegistro: 'Registrado',
                     OrigenDatos: 'Local + Gosen'
                 };
             } else {
-                // CASO 2: SOLO EXISTE EN GOSEN
-                // ID_Usuario es null -> Frontend mostrará botón "Crear Usuario"
+                // SOLO EN GOSEN
                 return {
                     NombreCompleto: externo.NombreCompleto,
                     CedulaUsuario: externo.Cedula,
                     Cargo: externo.CargoNombre,
-                    
                     ID_Usuario: null, 
                     NumeroLicencia: null,
                     Categoria: null,
                     VencimientoLicencia: null,
                     RutaLicencia: null,
-                    
                     EstadoRegistro: 'Pendiente',
                     OrigenDatos: 'Solo Gosen'
                 };
@@ -134,7 +118,6 @@ const getConductoresPESV = async (req, res) => {
 
 const guardarInfoConductor = async (req, res) => {
     const { idUsuario, numeroLicencia, categoria, vencimiento } = req.body;
-    // Si se subió archivo, guardamos la ruta. Si no, enviamos null (el SP mantiene la anterior).
     const archivoLicencia = req.file ? req.file.path.replace(/\\/g, '/') : null;
     
     try {
@@ -160,6 +143,8 @@ const guardarInfoConductor = async (req, res) => {
 
 const crearMantenimiento = async (req, res) => {
     const { idActivo, tipo, fecha, kilometraje, descripcion, taller, costo } = req.body;
+    const archivoEvidencia = req.file ? req.file.path.replace(/\\/g, '/') : null;
+
     try {
         const pool = await poolPromise;
         await pool.request()
@@ -170,10 +155,14 @@ const crearMantenimiento = async (req, res) => {
             .input('descripcion', mssql.NVarChar, descripcion)
             .input('taller', mssql.NVarChar, taller)
             .input('costo', mssql.Decimal(18, 2), costo)
-            .query('EXEC SP_CREATE_Mantenimiento @idActivo, @tipo, @fecha, @kilometraje, @descripcion, @taller, @costo');
+            .input('rutaEvidencia', mssql.NVarChar, archivoEvidencia)
+            .query('EXEC SP_CREATE_Mantenimiento @idActivo, @tipo, @fecha, @kilometraje, @descripcion, @taller, @costo, @rutaEvidencia');
         
         res.json({ msg: 'Mantenimiento registrado correctamente' });
-    } catch (err) { console.error(err); res.status(500).send('Error registrando mantenimiento'); }
+    } catch (err) { 
+        console.error(err); 
+        res.status(500).send('Error registrando mantenimiento'); 
+    }
 };
 
 const getMantenimientos = async (req, res) => {
@@ -233,22 +222,90 @@ const actualizarPasoPESV = async (req, res) => {
 };
 
 // ==========================================
-// 5. GENERACIÓN DE DOCUMENTOS Y PLANTILLAS
+// 5. GENERACIÓN DE DOCUMENTOS (ACTUALIZADO)
 // ==========================================
 
 const guardarConfiguracionPlantilla = async (req, res) => {
-    const { idPaso, titulo, cuerpo, campos } = req.body; 
+    // Recibimos la configuración base desde el panel del Super Admin
+    const { 
+        idPaso, titulo, cuerpo, campos,
+        codigo, version, fechaEmision, fechaRevision 
+    } = req.body; 
+
     try {
         const pool = await poolPromise;
         const jsonCampos = JSON.stringify(campos);
-        await pool.request()
-            .input('idPaso', mssql.Int, idPaso)
-            .input('titulo', mssql.NVarChar, titulo)
-            .input('cuerpo', mssql.NVarChar, cuerpo)
-            .input('jsonCampos', mssql.NVarChar(mssql.MAX), jsonCampos)
-            .query('EXEC SP_SAVE_PlantillaPESV @idPaso, @titulo, @cuerpo, @jsonCampos');
-        res.json({ msg: 'Configuración de plantilla guardada' });
-    } catch (err) { console.error(err); res.status(500).send('Error guardando plantilla'); }
+        
+        // Validación de fechas
+        const fEmision = fechaEmision ? new Date(fechaEmision) : null;
+        const fRevision = fechaRevision ? new Date(fechaRevision) : null;
+
+        const check = await pool.request().input('idPaso', mssql.Int, idPaso).query('SELECT ID_Plantilla FROM PlantillasDocPESV WHERE ID_Paso = @idPaso');
+        
+        let idPlantilla;
+
+        if (check.recordset.length > 0) {
+            // UPDATE
+            idPlantilla = check.recordset[0].ID_Plantilla;
+            await pool.request()
+                .input('idPaso', mssql.Int, idPaso)
+                .input('titulo', mssql.NVarChar, titulo)
+                .input('cuerpo', mssql.NVarChar, cuerpo)
+                .input('codigo', mssql.NVarChar, codigo)
+                .input('version', mssql.NVarChar, version)
+                .input('fEmision', mssql.Date, fEmision)
+                .input('fRevision', mssql.Date, fRevision)
+                .query(`
+                    UPDATE PlantillasDocPESV 
+                    SET TituloDocumento = @titulo, CuerpoInicial = @cuerpo,
+                        CodigoDocumento = @codigo, Version = @version,
+                        FechaEmision = @fEmision, FechaRevision = @fRevision
+                    WHERE ID_Paso = @idPaso
+                `);
+            
+            // Borrar campos viejos
+            await pool.request().input('idPlantilla', mssql.Int, idPlantilla).query('DELETE FROM CamposPlantillaPESV WHERE ID_Plantilla = @idPlantilla');
+        } else {
+            // INSERT
+            const result = await pool.request()
+                .input('idPaso', mssql.Int, idPaso)
+                .input('titulo', mssql.NVarChar, titulo)
+                .input('cuerpo', mssql.NVarChar, cuerpo)
+                .input('codigo', mssql.NVarChar, codigo)
+                .input('version', mssql.NVarChar, version)
+                .input('fEmision', mssql.Date, fEmision)
+                .input('fRevision', mssql.Date, fRevision)
+                .query(`
+                    INSERT INTO PlantillasDocPESV (ID_Paso, TituloDocumento, CuerpoInicial, CodigoDocumento, Version, FechaEmision, FechaRevision)
+                    VALUES (@idPaso, @titulo, @cuerpo, @codigo, @version, @fEmision, @fRevision);
+                    SELECT SCOPE_IDENTITY() AS id;
+                `);
+            idPlantilla = result.recordset[0].id;
+        }
+
+        // Insertar Campos
+        if (campos && campos.length > 0) {
+            const table = new mssql.Table('CamposPlantillaPESV');
+            table.create = false;
+            table.columns.add('ID_Plantilla', mssql.Int, { nullable: false });
+            table.columns.add('Etiqueta', mssql.NVarChar(100), { nullable: false });
+            table.columns.add('TipoInput', mssql.NVarChar(20), { nullable: false });
+            table.columns.add('Orden', mssql.Int, { nullable: false });
+
+            campos.forEach(c => {
+                table.rows.add(idPlantilla, c.label, c.tipo, c.orden);
+            });
+
+            const request = new mssql.Request(pool);
+            await request.bulk(table);
+        }
+
+        res.json({ msg: 'Configuración guardada exitosamente' });
+
+    } catch (err) { 
+        console.error(err); 
+        res.status(500).send('Error guardando plantilla'); 
+    }
 };
 
 const getPlantillaPaso = async (req, res) => {
@@ -262,23 +319,47 @@ const getPlantillaPaso = async (req, res) => {
 };
 
 const generarDocumentoPaso = async (req, res) => {
-    const { idPaso, datosFormulario } = req.body; 
+    // --- AQUÍ RECIBIMOS 'headerData' (Datos editados por el usuario al generar) ---
+    const { idPaso, datosFormulario, headerData } = req.body; 
+    
     try {
         const pool = await poolPromise;
         const resultConfig = await pool.request().input('idPaso', mssql.Int, idPaso).query('EXEC SP_GET_PlantillaPaso @idPaso');
-        if (resultConfig.recordsets[0].length === 0) return res.status(400).json({ msg: 'No hay plantilla configurada para este paso' });
+        
+        if (resultConfig.recordsets[0].length === 0) {
+            return res.status(400).json({ msg: 'No hay plantilla configurada para este paso' });
+        }
 
         const configBD = resultConfig.recordsets[0][0];
         const camposBD = resultConfig.recordsets[1];
-        const camposLlenos = camposBD.map(c => ({ label: c.Etiqueta, valor: datosFormulario[c.Etiqueta] || '---' }));
+        
+        const camposLlenos = camposBD.map(c => ({ 
+            label: c.Etiqueta, 
+            valor: datosFormulario[c.Etiqueta] || '---' 
+        }));
 
         const nombreArchivo = `Generado_Paso${idPaso}_${Date.now()}.pdf`;
         const rutaAbsoluta = path.join(__dirname, '../uploads', nombreArchivo);
         const rutaRelativa = `uploads/${nombreArchivo}`;
 
-        await generarActaPDF({ titulo: configBD.TituloDocumento, cuerpo: configBD.CuerpoInicial, camposLlenos: camposLlenos }, null, rutaAbsoluta);
+        // PRIORIDAD: Si el usuario envió headerData (desde el modal de generar), usamos eso.
+        // Si no, usamos los valores por defecto de la BD.
+        const datosHeader = {
+            titulo: configBD.TituloDocumento,
+            cuerpo: configBD.CuerpoInicial,
+            camposLlenos: camposLlenos,
+            
+            // Datos dinámicos vs BD
+            codigo: headerData?.codigo || configBD.CodigoDocumento,
+            version: headerData?.version || configBD.Version,
+            fechaEmision: headerData?.fechaEmision || (configBD.FechaEmision ? new Date(configBD.FechaEmision).toISOString().split('T')[0] : ''),
+            fechaRevision: headerData?.fechaRevision || (configBD.FechaRevision ? new Date(configBD.FechaRevision).toISOString().split('T')[0] : '')
+        };
 
-        // Guardar automáticamente como evidencia del paso y marcar como realizado
+        // Generamos el PDF con el encabezado correcto
+        await generarActaPDF(datosHeader, null, rutaAbsoluta);
+
+        // Guardar automáticamente como evidencia
         await pool.request()
             .input('idPaso', mssql.Int, idPaso)
             .input('estado', mssql.NVarChar, 'Realizado')
@@ -291,7 +372,7 @@ const generarDocumentoPaso = async (req, res) => {
 };
 
 // ==========================================
-// 6. CRUD DE PASOS (SUPER ADMIN)
+// 6. CRUD DE PASOS (SUPER ADMIN / ADMIN SST)
 // ==========================================
 
 const crearPaso = async (req, res) => {
@@ -339,9 +420,9 @@ export default {
     getPasosPESV, 
     getEvidenciasPorPaso, 
     actualizarPasoPESV,
-    guardarConfiguracionPlantilla, 
-    getPlantillaPaso,
-    generarDocumentoPaso,
+    guardarConfiguracionPlantilla, // Para guardar defaults (Super Admin)
+    getPlantillaPaso, 
+    generarDocumentoPaso, // Para generar PDF con datos editados en modal
     crearPaso, 
     editarPasoInfo, 
     eliminarPaso,

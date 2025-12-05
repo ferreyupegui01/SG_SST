@@ -27,6 +27,16 @@ router.get(
 );
 
 /**
+ * @route   GET /api/dashboard/admin-actividades-estado
+ * @desc    Obtener datos para gráfica de estados de actividades (NUEVO)
+ */
+router.get(
+    '/admin-actividades-estado',
+    [ protect, admin ],
+    dashboardController.getAdminActividadesEstado
+);
+
+/**
  * @route   GET /api/dashboard/admin-reportes
  * @desc    Obtener lista Top 5 de reportes nuevos
  */
@@ -42,7 +52,7 @@ router.get(
  */
 router.get(
     '/super-admin',
-    [ protect, admin ], // Reutilizamos 'admin' ya que Super Admin también pasa por ahí
+    [ protect, admin ], 
     dashboardController.getSuperAdminData
 );
 

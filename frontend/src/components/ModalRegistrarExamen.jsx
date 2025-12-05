@@ -98,7 +98,7 @@ const ModalRegistrarExamen = ({ alCerrar, alExito }) => {
             if(data.length === 0) Swal.fire('Info', 'No encontrado en Base de datos de Gosen', 'info');
         // eslint-disable-next-line no-unused-vars
         } catch (error) {
-            Swal.fire('Error', 'Fallo conexión Gosen', 'error');
+            Swal.fire('Error', 'Fallo conexión Gosem', 'error');
         } finally { setIsSearching(false); }
     };
 
@@ -157,7 +157,7 @@ const ModalRegistrarExamen = ({ alCerrar, alExito }) => {
                 {/* TABS */}
                 <div style={{display:'flex', borderBottom:'1px solid #eee', marginBottom:'1rem'}}>
                     <button type="button" onClick={() => setModoBusqueda('LOCAL')} style={{flex:1, padding:'10px', background:'none', borderBottom: modoBusqueda==='LOCAL'?'3px solid #005A5B':'none', fontWeight:'bold', color:modoBusqueda==='LOCAL'?'#005A5B':'#999', cursor:'pointer'}}><BsSearch/> Buscar Local</button>
-                    <button type="button" onClick={() => setModoBusqueda('GOSEN')} style={{flex:1, padding:'10px', background:'none', borderBottom: modoBusqueda==='GOSEN'?'3px solid #005A5B':'none', fontWeight:'bold', color:modoBusqueda==='GOSEN'?'#005A5B':'#999', cursor:'pointer'}}><BsCloudDownload/> Buscar en Gosen</button>
+                    <button type="button" onClick={() => setModoBusqueda('GOSEN')} style={{flex:1, padding:'10px', background:'none', borderBottom: modoBusqueda==='GOSEN'?'3px solid #005A5B':'none', fontWeight:'bold', color:modoBusqueda==='GOSEN'?'#005A5B':'#999', cursor:'pointer'}}><BsCloudDownload/> Buscar en Gosem</button>
                 </div>
 
                 {modoBusqueda === 'GOSEN' ? (

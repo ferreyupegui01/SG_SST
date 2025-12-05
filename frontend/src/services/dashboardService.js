@@ -7,7 +7,7 @@ import { apiFetch } from './apiService.js';
  * @desc Obtiene los 4 KPIs (contadores) para el dashboard del Admin
  */
 export const getAdminKPIs = async () => {
-    return apiFetch('/dashboard/admin-kpis'); // GET /api/dashboard/admin-kpis
+    return apiFetch('/dashboard/admin-kpis');
 };
 
 /**
@@ -15,7 +15,15 @@ export const getAdminKPIs = async () => {
  * @desc Obtiene la lista Top 5 de actividades pendientes
  */
 export const getAdminActividadesPendientes = async () => {
-    return apiFetch('/dashboard/admin-actividades'); // GET /api/dashboard/admin-actividades
+    return apiFetch('/dashboard/admin-actividades');
+};
+
+/**
+ * @service getAdminActividadesEstado
+ * @desc Obtiene los datos para la gráfica de pastel de actividades (NUEVO)
+ */
+export const getAdminActividadesEstado = async () => {
+    return apiFetch('/dashboard/admin-actividades-estado');
 };
 
 /**
@@ -23,5 +31,5 @@ export const getAdminActividadesPendientes = async () => {
  * @desc Obtiene la lista Top 5 de reportes nuevos
  */
 export const getAdminReportesRecientes = async () => {
-    return apiFetch('/dashboard/admin-reportes'); // GET /api/dashboard/admin-reportes
+    return apiFetch('/dashboard/admin-reportes');
 };

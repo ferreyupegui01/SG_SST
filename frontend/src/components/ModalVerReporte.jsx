@@ -5,9 +5,9 @@ import { getReporteMaquinaDetalle, getReporteSeguridadDetalle } from '../service
 import '../style/Modal.css';
 import '../index.css'; 
 import '../style/InspeccionesPage.css';
-import { BsSpeedometer2 } from 'react-icons/bs';
+import { BsSpeedometer2, BsGeoAlt, BsPersonBadge, BsCalendarCheck } from 'react-icons/bs';
 
-const ModalVerReporte = ({ reporte, tipo, alCerrar, alExito }) => {
+const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
     const [detalle, setDetalle] = useState(reporte);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -17,18 +17,35 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar, alExito }) => {
         const cargarDetalle = async () => {
             try {
                 setIsLoading(true);
+                
                 let data;
-                if (tipo === 'maquina' || tipo === 'Máquina (Pre-uso)') { // Soporte para ambos nombres
-                    data = await getReporteMaquinaDetalle(reporte.ID_ReporteMaquina || reporte.id.split('-')[1]);
+                // Soporte para ambos nombres de tipo que llegan del dashboard o tabla
+                if (tipo === 'maquina' || tipo === 'Máquina (Pre-uso)') { 
+                    data = await getReporteMaquinaDetalle(reporte.ID_ReporteMaquina || reporte.id?.split('-')[1]);
                 } else {
-                    data = await getReporteSeguridadDetalle(reporte.ID_ReporteSeguridad || reporte.id.split('-')[1]);
+                    data = await getReporteSeguridadDetalle(reporte.ID_ReporteSeguridad || reporte.id?.split('-')[1]);
                 }
+            
                 setDetalle(data); 
-                if (alExito) alExito(); 
-            } catch (err) { setError(err.message); } finally { setIsLoading(false); }
+                
+                // --- CORRECCIÓN: ELIMINADA LA LLAMADA A alExito() AQUÍ ---
+                // Esto evita que la tabla padre se recargue mientras el modal está abierto,
+                // rompiendo el bucle infinito.
+
+            } catch (err) { 
+                setError(err.message); 
+            } finally { 
+                setIsLoading(false); 
+            }
         };
         cargarDetalle();
-    }, [reporte, tipo, alExito]);
+    }, [reporte, tipo]); // Dependencias limpias
+
+    // Formatear fecha
+    const formatearFecha = (fecha) => {
+        if (!fecha) return 'N/A';
+        return new Date(fecha).toLocaleString('es-CO');
+    };
 
     return (
         <div className="modal-overlay" onClick={alCerrar}>
@@ -40,14 +57,14 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar, alExito }) => {
                 <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     {isLoading && <p>Cargando...</p>}
                     {error && <p className="modal-error">{error}</p>}
-                    
+            
                     {!isLoading && detalle && (
                         <div className="inspection-details">
                             
                             {/* === REPORTE DE MÁQUINA === */}
                             {(tipo === 'maquina' || tipo === 'Máquina (Pre-uso)') ? (
                                 <>
-                                    <div style={{display:'flex', gap:'1rem', marginBottom:'1rem', backgroundColor:'#f8f9fa', padding:'1rem', borderRadius:'8px'}}>
+                                    <div style={{display:'flex', gap:'1rem', marginBottom:'1rem', backgroundColor:'#f8f9fa', padding:'1rem', borderRadius:'8px', alignItems:'center'}}>
                                         <div style={{flex:1}}>
                                             <strong>Activo:</strong> {detalle.NombreActivo}
                                             <div style={{fontSize:'0.9rem', color:'#666'}}>{detalle.CodigoActivo} {detalle.Marca ? `- ${detalle.Marca}` : ''}</div>
@@ -64,23 +81,25 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar, alExito }) => {
                                     </div>
 
                                     {detalle.Kilometraje && (
-                                        <div className="detail-section" style={{color: '#007BFF', fontWeight:'bold'}}>
+                                        <div className="detail-section" style={{color: '#007BFF', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px'}}>
                                             <BsSpeedometer2 /> Kilometraje: {detalle.Kilometraje.toLocaleString()} km
                                         </div>
                                     )}
 
                                     <div className="detail-section">
-                                        <strong>Fecha:</strong> {new Date(detalle.FechaHoraReporte).toLocaleString('es-CO')}
+                                        <span style={{display:'flex', alignItems:'center', gap:'5px', color:'#666'}}>
+                                            <BsCalendarCheck/> {formatearFecha(detalle.FechaHoraReporte)}
+                                        </span>
                                     </div>
 
                                     {/* CHECKLIST */}
                                     {detalle.DatosReporte && (
                                         <div className="detail-section" style={{marginTop: '1rem'}}>
                                             <strong>Checklist de Verificación:</strong>
-                                            <div style={{ background: '#fff', padding: '0.5rem', border: '1px solid #eee', maxHeight: '250px', overflowY: 'auto' }}>
+                                            <div style={{ background: '#fff', padding: '0.5rem', border: '1px solid #eee', maxHeight: '250px', overflowY: 'auto', borderRadius:'8px' }}>
                                                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                                                     {JSON.parse(detalle.DatosReporte).map((item, idx) => (
-                                                        <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid #f0f0f0', fontSize: '0.9rem' }}>
+                                                        <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid #f0f0f0', fontSize: '0.9rem' }}>
                                                             <span>{item.pregunta}</span>
                                                             <span style={{ fontWeight: 'bold', color: item.respuesta === 'No Cumple' ? '#dc3545' : '#28a745' }}>
                                                                 {item.respuesta}
@@ -92,7 +111,7 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar, alExito }) => {
                                         </div>
                                     )}
 
-                                    {/* OBSERVACIONES (Siempre visible ahora) */}
+                                    {/* OBSERVACIONES */}
                                     <div className="detail-section" style={{marginTop:'1rem'}}>
                                         <strong>Observaciones / Detalles:</strong>
                                         <p className="detail-box" style={{
@@ -113,10 +132,30 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar, alExito }) => {
                             ) : (
                                 /* === REPORTE DE SEGURIDAD === */
                                 <>
-                                    <div className="detail-section"><strong>Tipo:</strong> {detalle.TipoReporte}</div>
-                                    <div className="detail-section"><strong>Ubicación:</strong> {detalle.UbicacionArea}</div>
+                                    <div style={{display:'flex', gap:'1rem', marginBottom:'1rem', backgroundColor:'#f8f9fa', padding:'1rem', borderRadius:'8px'}}>
+                                        <div style={{flex:1}}>
+                                            <strong>Tipo:</strong> <span style={{color:'#005A5B', fontWeight:'bold'}}>{detalle.TipoReporte}</span>
+                                        </div>
+                                        <div style={{flex:1}}>
+                                            <strong>Ubicación:</strong> <BsGeoAlt/> {detalle.UbicacionArea}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="detail-section">
+                                        <strong>Reportado por:</strong> {detalle.NombreUsuarioReporta}
+                                    </div>
+                                    <div className="detail-section">
+                                        <strong>Fecha:</strong> {formatearFecha(detalle.FechaHoraReporte)}
+                                    </div>
+
                                     <div className="detail-section"><strong>Descripción:</strong><p className="detail-box">{detalle.Descripcion}</p></div>
-                                    {detalle.RutaFotoAdjunta && <img src={`${API_BASE_URL}/${detalle.RutaFotoAdjunta.replace(/\\/g, '/')}`} alt="Evidencia" style={{ maxWidth: '100%' }} />}
+                                    
+                                    {detalle.RutaFotoAdjunta && (
+                                        <div className="detail-section">
+                                            <strong>Evidencia:</strong><br/>
+                                            <img src={`${API_BASE_URL}/${detalle.RutaFotoAdjunta.replace(/\\/g, '/')}`} alt="Evidencia" style={{ maxWidth: '100%', borderRadius:'8px' }} />
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>

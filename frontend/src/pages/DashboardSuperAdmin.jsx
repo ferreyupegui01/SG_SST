@@ -2,29 +2,52 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../services/apiService'; // Usamos apiFetch directo para simplificar
+import { apiFetch } from '../services/apiService'; 
+// Importamos el servicio de la gráfica que creamos previamente
+import { getAdminActividadesEstado } from '../services/dashboardService'; 
 import { Link } from 'react-router-dom';
-import '../style/DashboardAdmin.css'; // Reutilizamos estilos base
+import '../style/DashboardAdmin.css'; 
+
 // Iconos
 import { 
-    BsShieldLockFill, BsActivity, BsPeopleFill, BsDatabaseFillGear, 
-    BsCheckCircleFill, BsExclamationOctagonFill, BsGraphUp, BsBellFill 
+    BsShieldLockFill, BsActivity, BsPeopleFill, 
+    BsCheckCircleFill, BsExclamationOctagonFill, BsGraphUp, BsBellFill, BsPieChartFill
 } from 'react-icons/bs';
-// Gráficas
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+
+// Gráficas (Añadimos PieChart y componentes necesarios)
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+    PieChart, Pie, Cell, Legend 
+} from 'recharts';
 
 const DashboardSuperAdmin = () => {
     const { usuario } = useAuth();
-    const [data, setData] = useState(null);
+    
+    // Estados
+    const [data, setData] = useState(null); // Data general (KPIs, Barras, Logs)
+    const [actividadesGrafica, setActividadesGrafica] = useState([]); // Data para la gráfica de pastel
     const [loading, setLoading] = useState(true);
+
+    // Colores para la gráfica de pastel
+    const COLORES_GRAFICA = {
+        'Realizada': '#28a745',  // Verde
+        'Pendiente': '#ffc107',  // Amarillo
+        'Cancelada': '#dc3545'   // Rojo
+    };
 
     // Cargar Datos
     useEffect(() => {
         const cargarDatos = async () => {
             try {
-                // Llamamos al nuevo endpoint unificado
-                const respuesta = await apiFetch('/dashboard/super-admin');
-                setData(respuesta);
+                // Hacemos las dos peticiones en paralelo
+                const [respuestaGeneral, respuestaActividades] = await Promise.all([
+                    apiFetch('/dashboard/super-admin'),
+                    getAdminActividadesEstado()
+                ]);
+
+                setData(respuestaGeneral);
+                setActividadesGrafica(respuestaActividades);
+
             } catch (error) {
                 console.error(error);
             } finally {
@@ -34,8 +57,8 @@ const DashboardSuperAdmin = () => {
         cargarDatos();
     }, []);
 
-    if (loading) return <div className="page-container"><p>Cargando Centro de Comando...</p></div>;
-
+    if (loading) return <div className="page-container"><p style={{padding:'2rem', textAlign:'center'}}>Cargando Centro de Comando...</p></div>;
+    
     const { kpis, grafica, logs } = data;
 
     return (
@@ -75,13 +98,13 @@ const DashboardSuperAdmin = () => {
                 </div>
             </div>
 
-            {/* --- SECCIÓN 2: RENDIMIENTO Y LOGS (GRID ASIMÉTRICO) --- */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
+            {/* --- SECCIÓN 2: GRÁFICAS (GRID DE 2 COLUMNAS) --- */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 
-                {/* GRÁFICA DE RENDIMIENTO */}
+                {/* 1. GRÁFICA DE RENDIMIENTO (BARRAS) */}
                 <div className="page-content-card">
-                    <h2 style={{marginBottom: '1.5rem', display:'flex', alignItems:'center', gap:'10px'}}>
-                        <BsActivity /> Rendimiento del Sistema (Últimos 7 días)
+                    <h2 style={{marginBottom: '1.5rem', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.1rem'}}>
+                        <BsActivity /> Rendimiento (Últimos 7 días)
                     </h2>
                     <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
@@ -89,51 +112,89 @@ const DashboardSuperAdmin = () => {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                                 <XAxis dataKey="Dia" />
                                 <YAxis />
-                                <RechartsTooltip 
+                                <Tooltip 
                                     contentStyle={{borderRadius:'8px', border:'none', boxShadow:'0 2px 10px rgba(0,0,0,0.1)'}}
                                 />
-                                <Bar dataKey="CantidadAcciones" name="Acciones/Eventos" fill="#005A5B" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="CantidadAcciones" name="Eventos" fill="#005A5B" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* NOTIFICACIONES / LOGS EN VIVO */}
-                <div className="page-content-card" style={{maxHeight: '400px', overflowY: 'auto'}}>
-                    <h2 style={{marginBottom: '1rem', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.2rem'}}>
-                        <BsBellFill style={{color:'#f1c40f'}} /> Actividad Reciente
+                {/* 2. GRÁFICA DE ACTIVIDADES (PASTEL) - NUEVA PARA SUPER ADMIN */}
+                <div className="page-content-card">
+                    <h2 style={{marginBottom: '1.5rem', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.1rem'}}>
+                        <BsPieChartFill /> Estado Global de Actividades
                     </h2>
-                    {logs.length === 0 ? (
-                        <p style={{color:'#999'}}>No hay actividad reciente.</p>
-                    ) : (
-                        <ul style={{listStyle:'none', padding:0}}>
-                            {logs.map(log => (
-                                <li key={log.ID_Log} style={{
-                                    padding: '0.8rem 0',
-                                    borderBottom: '1px solid #eee',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{fontWeight:'bold', color:'#333', marginBottom:'0.2rem'}}>
-                                        {log.Accion}
-                                    </div>
-                                    <div style={{color:'#666', marginBottom:'0.2rem'}}>
-                                        {log.Descripcion.substring(0, 60)}{log.Descripcion.length > 60 ? '...' : ''}
-                                    </div>
-                                    <div style={{fontSize:'0.75rem', color:'#999', display:'flex', justifyContent:'space-between'}}>
-                                        <span>👤 {log.NombreUsuario}</span>
-                                        <span>🕒 {new Date(log.FechaHora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    <div style={{textAlign:'center', marginTop:'1rem'}}>
-                        <Link to="/logs" className="btn btn-secondary btn-sm" style={{fontSize:'0.8rem'}}>Ver Auditoría Completa</Link>
+                    <div style={{ width: '100%', height: 300, display:'flex', justifyContent:'center', alignItems:'center' }}>
+                        {actividadesGrafica.length === 0 ? (
+                            <p style={{color:'#999'}}>No hay actividades registradas.</p>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={actividadesGrafica}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={70}
+                                        outerRadius={100}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                        label={({percent}) => `${(percent * 100).toFixed(0)}%`}
+                                    >
+                                        {actividadesGrafica.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORES_GRAFICA[entry.name] || '#8884d8'} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{borderRadius:'8px'}} />
+                                    <Legend verticalAlign="bottom" height={36} iconType="circle"/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
+                </div>
+
+            </div>
+
+            {/* --- SECCIÓN 3: LOGS EN VIVO (Ancho Completo) --- */}
+            <div className="page-content-card" style={{ marginBottom: '2rem' }}>
+                <h2 style={{marginBottom: '1rem', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.2rem'}}>
+                    <BsBellFill style={{color:'#f1c40f'}} /> Auditoría Reciente
+                </h2>
+                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {logs.length === 0 ? (
+                        <p style={{color:'#999', padding:'1rem'}}>No hay actividad reciente.</p>
+                    ) : (
+                        <table className="data-table" style={{fontSize:'0.9rem'}}>
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Usuario</th>
+                                    <th>Acción</th>
+                                    <th>Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {logs.map(log => (
+                                    <tr key={log.ID_Log}>
+                                        <td style={{whiteSpace:'nowrap', color:'#666'}}>
+                                            {new Date(log.FechaHora).toLocaleDateString()} {new Date(log.FechaHora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </td>
+                                        <td><strong>{log.NombreUsuario}</strong></td>
+                                        <td><span className="status-pill status-proceso" style={{fontSize:'0.75rem'}}>{log.Accion}</span></td>
+                                        <td>{log.Descripcion}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                <div style={{textAlign:'center', marginTop:'1rem'}}>
+                    <Link to="/logs" className="btn btn-secondary btn-sm">Ver Historial Completo</Link>
                 </div>
             </div>
 
-            {/* --- SECCIÓN 3: ACCESOS RÁPIDOS DE CONTROL --- */}
+            {/* --- ACCESOS RÁPIDOS --- */}
             <h2 style={{fontSize: '1.2rem', marginBottom: '1rem', color: '#666'}}>Panel de Control</h2>
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                 <Link to="/usuarios" className="kpi-card-link">
@@ -148,11 +209,12 @@ const DashboardSuperAdmin = () => {
                         <small style={{color:'#666'}}>Traza de seguridad</small>
                     </div>
                 </Link>
-                {/* Próximamente: Permisos Dinámicos */}
-                <div className="kpi-card" style={{ borderLeft: '4px solid #6c757d', padding:'1rem', opacity:0.6, cursor:'not-allowed' }}>
-                    <h4 style={{margin:0, color:'#6c757d'}}>Permisos Dinámicos</h4>
-                    <small style={{color:'#666'}}>Próximamente (Fase 3)</small>
-                </div>
+                <Link to="/super-admin/formularios" className="kpi-card-link">
+                    <div className="kpi-card" style={{ borderLeft: '4px solid #28a745', padding:'1rem' }}>
+                        <h4 style={{margin:0, color:'#28a745'}}>Formularios</h4>
+                        <small style={{color:'#666'}}>Diseñador de Inspecciones</small>
+                    </div>
+                </Link>
             </div>
         </div>
     );

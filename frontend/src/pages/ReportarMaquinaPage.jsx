@@ -9,10 +9,10 @@ import { useAuth } from '../context/AuthContext';
 import '../index.css'; 
 import '../style/ReportarPage.css'; 
 import Swal from 'sweetalert2'; 
-import { BsArrowLeftCircle, BsSpeedometer2, BsSearch, BsChevronDown } from 'react-icons/bs';
+import { BsArrowLeftCircle, BsSpeedometer2, BsSearch, BsChevronDown, BsPersonBadge } from 'react-icons/bs';
 
 const ReportarMaquinaPage = () => {
-    const { usuario } = useAuth(); 
+    const { usuario } = useAuth(); // Aquí obtenemos los datos del logueado
     
     // Estados del Reporte
     const [idActivo, setIdActivo] = useState('');
@@ -29,7 +29,7 @@ const ReportarMaquinaPage = () => {
     const [busquedaActivo, setBusquedaActivo] = useState('');
     const [activosFiltrados, setActivosFiltrados] = useState([]);
     const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
-    const wrapperRef = useRef(null); // Detectar clic fuera
+    const wrapperRef = useRef(null); 
 
     // Estados de Lógica Interna
     const [activoInfo, setActivoInfo] = useState(null);
@@ -46,7 +46,7 @@ const ReportarMaquinaPage = () => {
     // eslint-disable-next-line no-unused-vars
     const navigate = useNavigate();
 
-    // 1. Carga Inicial Inteligente
+    // 1. Carga Inicial
     useEffect(() => {
         const cargarDatosMaestros = async () => {
             try {
@@ -65,7 +65,7 @@ const ReportarMaquinaPage = () => {
                 );
 
                 setListaActivos(activosFiltradosBD);
-                setActivosFiltrados(activosFiltradosBD); // Inicializamos el filtro con todos
+                setActivosFiltrados(activosFiltradosBD);
 
             } catch (err) {
                 console.error(err);
@@ -88,19 +88,17 @@ const ReportarMaquinaPage = () => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [wrapperRef]);
 
-    // 3. Lógica del Buscador de Activos
+    // 3. Lógica del Buscador
     const handleSearchChange = (e) => {
         const texto = e.target.value;
         setBusquedaActivo(texto);
         
-        // Si borra el texto, reseteamos selección
         if (texto === '') {
             setIdActivo('');
             setActivoInfo(null);
             setPreguntasActivas([]);
         }
 
-        // Filtrar por Nombre o Código
         const filtrados = listaActivos.filter(a => 
             a.NombreDescriptivo.toLowerCase().includes(texto.toLowerCase()) ||
             a.CodigoIdentificador.toLowerCase().includes(texto.toLowerCase())
@@ -113,10 +111,9 @@ const ReportarMaquinaPage = () => {
         setBusquedaActivo(`${activo.NombreDescriptivo} (${activo.CodigoIdentificador})`);
         setIdActivo(activo.ID_Activo);
         setMostrarSugerencias(false);
-        // El useEffect de abajo se encargará de cargar el formulario al detectar cambio en idActivo
     };
 
-    // 4. Buscar Formulario y Preguntas (Se dispara al seleccionar activo)
+    // 4. Buscar Formulario y Preguntas
     useEffect(() => {
         if (!idActivo) {
             setPreguntasActivas([]);
@@ -221,10 +218,10 @@ const ReportarMaquinaPage = () => {
             await crearReporteMaquina(formData);
             Swal.fire('Enviado', 'Reporte registrado exitosamente.', 'success');
             
-            // Resetear todo
+            // Resetear
             setIdActivo('');
-            setBusquedaActivo(''); // Limpiar buscador
-            setActivosFiltrados(listaActivos); // Resetear lista filtrada
+            setBusquedaActivo('');
+            setActivosFiltrados(listaActivos);
             setEstadoReportado('OK');
             setDescripcionProblema('');
             setKilometraje('');
@@ -250,7 +247,7 @@ const ReportarMaquinaPage = () => {
             <div className="page-content-card" style={{ maxWidth: '800px', margin: '0 auto' }}>
                 <form onSubmit={handleSubmit}>
                     
-                    {/* --- BUSCADOR INTELIGENTE DE EQUIPO --- */}
+                    {/* --- BUSCADOR INTELIGENTE --- */}
                     <div className="form-group" ref={wrapperRef}>
                         <label>Seleccione el Equipo:</label>
                         {isLoadingData ? (
@@ -271,7 +268,6 @@ const ReportarMaquinaPage = () => {
                                 />
                                 <BsChevronDown style={{position: 'absolute', top: '12px', right: '12px', color: '#999', cursor:'pointer'}} onClick={() => setMostrarSugerencias(!mostrarSugerencias)}/>
 
-                                {/* LISTA FLOTANTE */}
                                 {mostrarSugerencias && (
                                     <div style={{
                                         position: 'absolute', top: '100%', left: 0, right: 0,
@@ -309,7 +305,7 @@ const ReportarMaquinaPage = () => {
                         )}
                     </div>
 
-                    {/* INFO DEL ACTIVO */}
+                    {/* --- INFO DEL ACTIVO + USUARIO LOGUEADO --- */}
                     {activoInfo && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', backgroundColor: '#eef2f7', padding: '1rem', borderRadius: '8px' }}>
                             <div className="form-group" style={{marginBottom:0}}>
@@ -320,12 +316,18 @@ const ReportarMaquinaPage = () => {
                                 <label style={{fontSize:'0.8rem', fontWeight:'bold', color:'#666'}}>Marca/Modelo:</label>
                                 <div style={{fontSize:'1rem'}}>{activoInfo.Marca || ''} {activoInfo.Modelo || ''}</div>
                             </div>
-                            <div className="form-group" style={{marginBottom:0, gridColumn:'span 2'}}>
-                                <label style={{fontSize:'0.8rem', fontWeight:'bold', color:'#666'}}>Responsable:</label>
+                            
+                            {/* --- CORRECCIÓN FINAL (Multiopción) --- */}
+                            <div className="form-group" style={{marginBottom:0, gridColumn:'span 2', borderTop:'1px solid #ddd', paddingTop:'10px', marginTop:'5px'}}>
+                                <label style={{fontSize:'0.8rem', fontWeight:'bold', color:'#666', display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <BsPersonBadge /> Reportado por:
+                                </label>
                                 <div style={{fontSize:'1rem', color: '#005A5B', fontWeight:'bold'}}>
-                                    {activoInfo.NombreConductor || usuario?.nombre}
+                                    {usuario?.NombreCompleto || usuario?.nombre || usuario?.Nombre}
                                 </div>
+                               
                             </div>
+                            {/* --------------------------------------------------- */}
                         </div>
                     )}
 

@@ -71,3 +71,47 @@
     padding: 1rem;
     border-radius: 8px;
 }
+
+
+/* ... (Código anterior) ... */
+
+/* AGREGAR AL FINAL: */
+
+@media (max-width: 768px) {
+    /* Contenedor del calendario */
+    .calendar-card {
+        padding: 0.5rem; /* Menos padding */
+    }
+
+    /* Altura del calendario */
+    .rbc-calendar {
+        height: 500px !important; /* Un poco menos alto */
+        font-size: 0.75rem !important; /* Letra más pequeña */
+    }
+
+    /* Cabecera del calendario (Días) */
+    .rbc-header {
+        padding: 2px 0 !important;
+        font-size: 0.7rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Botones de la barra de herramientas del calendario */
+    .rbc-toolbar button {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Título del calendario (Mes/Año) */
+    .rbc-toolbar-label {
+        font-size: 1rem;
+        font-weight: bold;
+    }
+    
+    /* Selector de Cronograma */
+    .cronograma-selector select {
+        width: 100%;
+        min-width: 0; /* Permitir que encoja */
+    }
+}

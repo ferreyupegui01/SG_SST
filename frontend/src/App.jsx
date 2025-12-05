@@ -23,8 +23,9 @@ import ReportarSeguridadPage from './pages/ReportarSeguridadPage.jsx';
 import DashboardSuperAdmin from './pages/DashboardSuperAdmin';
 import DashboardCalidad from './pages/DashboardCalidad';
 import GestionFormulariosPage from './pages/GestionFormulariosPage'; 
-// IMPORTAR LA PÁGINA NUEVA
-import DirectorioExternoPage from './pages/DirectorioExternoPage'; 
+import DirectorioExternoPage from './pages/DirectorioExternoPage';
+// --- IMPORTACIÓN NUEVA ---
+import ActasPage from './pages/ActasPage.jsx'; 
 
 import MainLayout from './layout/MainLayout'; 
 import ColaboradorLayout from './layout/ColaboradorLayout.jsx'; 
@@ -93,16 +94,13 @@ function App() {
 
                     {/* CALIDAD */}
                     <Route path="calidad" element={<CalidadRoutes />}>
-                        <Route path="dashboard" element={<DashboardCalidad />} />
+                         <Route path="dashboard" element={<DashboardCalidad />} />
                     </Route>
 
                     {/* GESTIÓN */}
                     <Route element={<AdminRoutes />}>
                         <Route path="usuarios" element={<UsuariosPage />} />
-                        
-                        {/* --- RUTA NUEVA --- */}
                         <Route path="directorio" element={<DirectorioExternoPage />} />
-                        {/* ------------------ */}
 
                         <Route path="activos" element={<ActivosPage />} /> 
                         <Route path="planificacion" element={<PlanificacionPage />} />
@@ -115,6 +113,9 @@ function App() {
                         <Route path="pesv" element={<PesvPage />} /> 
                         <Route path="solicitudes" element={<SolicitudesPage />} />
                         <Route path="logs" element={<LogsPage />} />
+                        
+                        {/* --- RUTA NUEVA --- */}
+                        <Route path="actas" element={<ActasPage />} />
                     </Route>
 
                     {/* COLABORADOR */}

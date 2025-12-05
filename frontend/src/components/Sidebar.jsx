@@ -12,7 +12,8 @@ import {
     BsExclamationTriangleFill, BsGraphUpArrow, BsHouseFill, BsCpuFill, 
     BsShieldFillExclamation, BsFillFolderFill, BsHeartPulseFill, BsArchiveFill, 
     BsFileEarmarkTextFill, BsShieldLockFill, BsJournalCheck, BsListCheck, 
-    BsBarChartFill, BsConeStriped, BsEnvelopeExclamation, BsJournalRichtext
+    BsBarChartFill, BsConeStriped, BsEnvelopeExclamation, BsJournalRichtext,
+    BsFileText // <--- Icono para Actas
 } from 'react-icons/bs';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -89,6 +90,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
                             <BsGraphUpArrow /> Acciones (ACPM)
                         </NavLink>
+                        {/* También pueden ver actas */}
+                        <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
+                            <BsFileText /> Actas de Comité
+                        </NavLink>
                     </>
                 )}
 
@@ -142,6 +147,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
                             <BsGraphUpArrow /> Acciones (ACPM)
                         </NavLink>
+                        
+                        {/* --- ENLACE NUEVO --- */}
+                        <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
+                            <BsFileText /> Actas de Comité
+                        </NavLink>
+                        {/* -------------------- */}
 
                         <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
                             <BsEnvelopeExclamation /> Solicitudes a Gerencia

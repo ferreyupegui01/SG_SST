@@ -21,31 +21,45 @@ const dbConfig = {
     }
 };
 
-// 2. Endpoint de Búsqueda General (Se mantiene igual)
+// 2. Endpoint de Búsqueda General (ACTUALIZADO)
 app.get('/api/gosen/empleados', async (req, res) => {
     const q = req.query.q || '';
 
     try {
         const pool = await mssql.connect(dbConfig);
 
+        // CONSULTA SQL
+        // Traemos todas las fechas posibles para decidir en el backend cuál mostrar
         const query = `
             SELECT TOP 50
                 r.cod_recurso AS Cedula,
                 r.nombres + ' ' + r.apellidos AS NombreCompleto,
                 o.des_oficio AS CargoNombre,
-                c.id_area AS AreaID,
-                r.mail AS Email
+                r.mail AS Email,
+                
+                -- Centro de Costos
+                ISNULL(cc.des_centro_costo, 'Sin Centro Asignado') AS CentroCosto,
+                
+                -- Fechas y Estado
+                c.fecha_inicio AS FechaInicio,
+                c.fecha_fin AS FechaFin,
+                c.fecha_terminacion AS FechaTerminacion,
+                c.estado AS EstadoContrato
+
             FROM [dbo].[rh_recursos] r
             INNER JOIN [dbo].[rh_co_contratos] c ON r.id_recurso = c.id_recurso
             LEFT JOIN [dbo].[rh_oficios] o ON c.id_oficio = o.id_oficio
+            LEFT JOIN [dbo].[rh_co_centros_costos] cc ON c.id_centro_costo = cc.id_centro_costo
+            
             WHERE 
-                c.estado = 1 
-                AND (
+                (
                     r.cod_recurso LIKE @search OR 
                     r.nombres LIKE @search OR 
                     r.apellidos LIKE @search
                 )
-            ORDER BY r.nombres ASC
+            
+            -- Ordenar: Activos (1) primero
+            ORDER BY c.estado DESC, r.nombres ASC
         `;
 
         const result = await pool.request()
@@ -62,12 +76,10 @@ app.get('/api/gosen/empleados', async (req, res) => {
     }
 });
 
-// 3. NUEVO ENDPOINT: Obtener Conductores y Montacarguistas (CORREGIDO)
+// 3. Endpoint Conductores (PESV)
 app.get('/api/gosen/conductores-activos', async (req, res) => {
     try {
         const pool = await mssql.connect(dbConfig);
-
-        // CONSULTA AJUSTADA A LA LISTA REAL DE CARGOS
         const query = `
             SELECT 
                 r.cod_recurso AS Cedula,
@@ -78,28 +90,26 @@ app.get('/api/gosen/conductores-activos', async (req, res) => {
             INNER JOIN [dbo].[rh_co_contratos] c ON r.id_recurso = c.id_recurso
             LEFT JOIN [dbo].[rh_oficios] o ON c.id_oficio = o.id_oficio
             WHERE 
-                c.estado = 1 -- Solo empleados activos
+                c.estado = 1 
                 AND (
-                    o.des_oficio LIKE '%CONDUCTOR%' OR        -- Atrapa: CONDUCTOR, CONDUCTOR MAYORISTA
-                    o.des_oficio LIKE '%MONTACARGUISTA%' OR   -- Atrapa: MONTACARGUISTA, MONTACARGUISTA RECIBO
-                    o.des_oficio LIKE '%MOTOCARGUISTA%' OR    -- Atrapa: MOTOCARGUISTA
+                    o.des_oficio LIKE '%CONDUCTOR%' OR
+                    o.des_oficio LIKE '%MONTACARGUISTA%' OR
+                    o.des_oficio LIKE '%MOTOCARGUISTA%' OR
                     o.des_oficio LIKE '%CHOFER%' OR 
                     o.des_oficio LIKE '%TRANSPORTADOR%'
                 )
             ORDER BY r.nombres ASC
         `;
-
         const result = await pool.request().query(query);
         res.json(result.recordset);
-
     } catch (err) {
-        console.error('❌ Error obteniendo conductores GOSEN:', err.message);
-        res.status(500).json({ error: 'Error consultando conductores externos' });
+        console.error('❌ Error conductores GOSEN:', err.message);
+        res.status(500).json({ error: 'Error consultando conductores' });
     } finally {
         await mssql.close();
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 API Gosen (Cargos: Montacarguista/Conductor) corriendo en http://localhost:${PORT}`);
+    console.log(`🚀 API Gosen corriendo en http://localhost:${PORT}`);
 });

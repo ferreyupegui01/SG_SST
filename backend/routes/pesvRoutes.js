@@ -13,7 +13,13 @@ router.post('/conductores', [protect, admin], upload.single('archivoLicencia'), 
 
 // Mantenimientos
 router.get('/mantenimientos', [protect, admin], pesvController.getMantenimientos);
-router.post('/mantenimientos', [protect, admin], pesvController.crearMantenimiento);
+
+// --- CAMBIO AQUÍ: Agregamos upload.single('evidencia') ---
+router.post('/mantenimientos', 
+    [protect, admin], 
+    upload.single('evidencia'), // Permite recibir el archivo
+    pesvController.crearMantenimiento
+);
 
 // Pasos PESV
 router.get('/pasos', [protect, admin], pesvController.getPasosPESV);
@@ -24,8 +30,6 @@ router.get('/documentos-internos', [protect], pesvController.getDocumentosGenera
 
 // Actualizaciones
 router.post('/pasos/actualizar', [protect, admin], upload.single('evidencia'), pesvController.actualizarPasoPESV);
-
-// REEMPLAZAR EVIDENCIA (Ruta nueva para el botón de actualizar)
 router.put('/evidencias/reemplazar', [protect, admin], upload.single('evidencia'), pesvController.reemplazarEvidencia);
 
 // Plantillas y Generación

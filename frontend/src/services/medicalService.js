@@ -2,43 +2,40 @@
 
 import { apiFetch } from './apiService.js';
 
-/**
- * @service getHistorialExamenes
- * @desc Obtiene la lista de todos los exámenes médicos registrados
- */
 export const getHistorialExamenes = async () => {
-    return apiFetch('/medicina'); // GET /api/medicina
+    return apiFetch('/medicina'); 
 };
 
-/**
- * @service registrarExamen
- * @desc Registra un nuevo examen médico (RF-029)
- * @param {object} datosExamen
- */
 export const registrarExamen = async (datosExamen) => {
     return apiFetch('/medicina', {
         method: 'POST',
         body: JSON.stringify(datosExamen),
-    }); // POST /api/medicina
+    }); 
+};
+
+export const getExamenMedicoDetalle = async (idExamenMedico) => {
+    return apiFetch(`/medicina/${idExamenMedico}`); 
 };
 
 /**
  * @service generarPdfExamen
- * @desc Descarga el PDF de recomendaciones (RF-030)
- * @param {number} idExamenMedico
- * @param {string} cedulaColaborador - Para el nombre del archivo
+ * @desc Genera y descarga el PDF enviando los datos del encabezado
  */
-export const generarPdfExamen = async (idExamenMedico, cedulaColaborador) => {
+export const generarPdfExamen = async (idExamenMedico, cedulaColaborador, headerData) => {
     const token = localStorage.getItem('token');
+    
+    // Usamos POST para enviar el JSON con los datos del encabezado
     const response = await fetch(`http://localhost:5000/api/medicina/${idExamenMedico}/pdf`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
+        method: 'POST',
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(headerData)
     });
 
     if (!response.ok) {
-        try { const errData = await response.json(); throw new Error(errData.msg || 'No se pudo generar el PDF');} 
-        // eslint-disable-next-line no-unused-vars
-        catch (e) { throw new Error(`Error ${response.status}: No se pudo generar el PDF.`); }
+        throw new Error(`Error ${response.status}: No se pudo generar el PDF.`);
     }
     
     const blob = await response.blob();
@@ -50,14 +47,4 @@ export const generarPdfExamen = async (idExamenMedico, cedulaColaborador) => {
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
-};
-
-/**
- * @service getExamenMedicoDetalle
- * @desc Obtiene el detalle completo de UN examen (para el modal)
- * @param {number} idExamenMedico
- */
-export const getExamenMedicoDetalle = async (idExamenMedico) => {
-    // Esta es la función que faltaba exportar
-    return apiFetch(`/medicina/${idExamenMedico}`); // GET /api/medicina/:id
 };

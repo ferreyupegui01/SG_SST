@@ -24,6 +24,7 @@ import indicatorRoutes from './routes/indicatorRoutes.js';
 import pesvRoutes from './routes/pesvRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import collabDocsRoutes from './routes/collabDocsRoutes.js';
+import committeeRoutes from './routes/committeeRoutes.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +60,7 @@ app.use('/api/indicadores', indicatorRoutes);
 app.use('/api/pesv', pesvRoutes);
 app.use('/api/solicitudes', requestRoutes);
 app.use('/api/colaboradores-docs', collabDocsRoutes);
+app.use('/api/actas', committeeRoutes);
 
 initCronJobs();
 

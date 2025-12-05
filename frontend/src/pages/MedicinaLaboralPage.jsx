@@ -1,226 +1,108 @@
-// frontend/src/pages/MedicinaLaboralPage.jsx
+// frontend/src/components/ModalGenerarPdfMedico.jsx
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { getHistorialExamenes, generarPdfExamen } from '../services/medicalService';
-import { BsPlusLg, BsFileEarmarkPdfFill, BsSearch } from 'react-icons/bs';
-import '../index.css'; 
+import React, { useState } from 'react';
+import { generarPdfExamen } from '../services/medicalService';
+import '../style/Modal.css';
+import { BsFileEarmarkPdfFill, BsCardHeading, BsCalendarEvent, BsHash } from 'react-icons/bs';
+import Swal from 'sweetalert2';
 
-import ModalRegistrarExamen from '../components/ModalRegistrarExamen';
-import ModalVerExamen from '../components/ModalVerExamen'; 
-
-const MedicinaLaboralPage = () => {
-    // --- Estados ---
-    const [historial, setHistorial] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [isDownloading, setIsDownloading] = useState(null); 
+const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
     
-    // --- Filtros (NUEVO) ---
-    const [busqueda, setBusqueda] = useState('');
-    const [filtroConcepto, setFiltroConcepto] = useState('');
+    // Valores por defecto del encabezado
+    const [headerData, setHeaderData] = useState({
+        codigo: 'SST-FTO-001',
+        version: '1',
+        fechaEmision: new Date().toISOString().split('T')[0],
+        fechaRevision: new Date().toISOString().split('T')[0]
+    });
 
-    // --- Estados de Modales ---
-    const [modalRegistroAbierto, setModalRegistroAbierto] = useState(false);
-    const [modalVerAbierto, setModalVerAbierto] = useState(false); 
-    const [examenSeleccionadoId, setExamenSeleccionadoId] = useState(null); 
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    // --- Carga Inicial del Historial ---
-    const cargarHistorial = async () => {
-        try {
-            setIsLoading(true);
-            const data = await getHistorialExamenes();
-            setHistorial(data);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
+    const handleChange = (e) => {
+        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
     };
 
-    useEffect(() => {
-        cargarHistorial();
-    }, []); 
-
-    // --- LÓGICA DE FILTRADO (NUEVA) ---
-    const historialFiltrado = useMemo(() => {
-        return historial.filter(examen => {
-            const texto = busqueda.toLowerCase();
+    const handleGenerar = async (e) => {
+        e.preventDefault();
+        setIsGenerating(true);
+        try {
+            // Llamamos al servicio enviando el ID, Cédula y los datos del Encabezado
+            await generarPdfExamen(examen.ID_ExamenMedico, examen.CedulaColaborador, headerData);
             
-            // 1. Búsqueda por Nombre, Cédula o Tipo de Examen
-            const matchTexto = 
-                examen.NombreColaborador.toLowerCase().includes(texto) ||
-                examen.CedulaColaborador.includes(texto) ||
-                examen.TipoExamen.toLowerCase().includes(texto);
-
-            // 2. Filtro por Concepto
-            const matchConcepto = filtroConcepto ? examen.ConceptoAptitud === filtroConcepto : true;
-
-            return matchTexto && matchConcepto;
-        });
-    }, [historial, busqueda, filtroConcepto]);
-
-    // --- Manejadores ---
-    const handleExamenRegistrado = () => {
-        setModalRegistroAbierto(false); 
-        cargarHistorial(); 
-    };
-    
-    const abrirModalVer = (id) => {
-        setExamenSeleccionadoId(id);
-        setModalVerAbierto(true);
-    };
-    const cerrarModalVer = () => {
-        setModalVerAbierto(false);
-        setExamenSeleccionadoId(null);
-    };
-
-    const handleGenerarPDF = async (examen) => {
-        setIsDownloading(examen.ID_ExamenMedico);
-        try {
-            await generarPdfExamen(examen.ID_ExamenMedico, examen.CedulaColaborador);
-        } catch (err) {
-            console.error(err);
-            alert(`Error al generar el PDF: ${err.message}`);
+            Swal.fire({
+                icon: 'success',
+                title: 'PDF Descargado',
+                text: 'El documento se ha generado correctamente.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            alCerrar();
+        } catch (error) {
+            Swal.fire('Error', error.message, 'error');
         } finally {
-            setIsDownloading(null);
+            setIsGenerating(false);
         }
-    };
-
-    const formatearFecha = (fechaISO) => {
-        if (!fechaISO) return 'N/A';
-        const fecha = new Date(fechaISO.split('T')[0] + 'T00:00:00');
-        return fecha.toLocaleDateString('es-CO');
-    };
-    
-    const getConceptoClass = (concepto) => {
-        if (concepto === 'Apto') return 'status-activo'; 
-        if (concepto === 'Apto con restricciones') return 'status-pendiente'; 
-        if (concepto === 'No Apto') return 'status-inactivo'; 
-        return '';
     };
 
     return (
-        <div className="page-container">
-            {/* --- Encabezado --- */}
-            <div className="page-header">
-                <h1>Medicina Laboral - Exámenes</h1>
-                <button 
-                    className="btn btn-primary"
-                    onClick={() => setModalRegistroAbierto(true)}
-                >
-                    <BsPlusLg /> Registrar Examen
-                </button>
-            </div>
-
-            {/* --- BARRA DE FILTROS (NUEVA) --- */}
-            <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                {/* Input Búsqueda */}
-                <div className="search-input-container" style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
-                    <BsSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Buscar por nombre, cédula o tipo..." 
-                        style={{ paddingLeft: '35px', height: '40px' }}
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
-                    />
-                </div>
-
-                {/* Select Concepto */}
-                <div className="filter-select-container" style={{ minWidth: '220px' }}>
-                    <select 
-                        className="form-control"
-                        style={{ height: '40px' }}
-                        value={filtroConcepto}
-                        onChange={(e) => setFiltroConcepto(e.target.value)}
-                    >
-                        <option value="">Todos los Conceptos</option>
-                        <option value="Apto">Apto</option>
-                        <option value="Apto con restricciones">Apto con restricciones</option>
-                        <option value="No Apto">No Apto</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* --- Tarjeta de Contenido (Tabla) --- */}
-            <div className="page-content-card">
-                <h2>Historial de Exámenes Registrados</h2>
+        <div className="modal-overlay" onClick={alCerrar}>
+            <div className="modal-content" style={{maxWidth:'500px'}} onClick={e => e.stopPropagation()}>
                 
-                <div className="table-wrapper">
-                    {isLoading && <p>Cargando historial...</p>}
-                    {error && <p className="error-message">Error: {error}</p>}
-                    
-                    {!isLoading && !error && (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Colaborador</th>
-                                    <th>Cédula</th>
-                                    <th>Tipo de Examen</th>
-                                    <th>Fecha Examen</th>
-                                    <th>Concepto Aptitud</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {historialFiltrado.length === 0 ? (
-                                    <tr><td colSpan="6" style={{ textAlign: 'center' }}>No se encontraron exámenes.</td></tr>
-                                ) : (
-                                    historialFiltrado.map((examen) => (
-                                        <tr key={examen.ID_ExamenMedico}>
-                                            <td>{examen.NombreColaborador}</td>
-                                            <td>{examen.CedulaColaborador}</td>
-                                            <td>{examen.TipoExamen}</td>
-                                            <td>{formatearFecha(examen.FechaExamen)}</td>
-                                            <td>
-                                                <span className={`status-pill ${getConceptoClass(examen.ConceptoAptitud)}`}>
-                                                    {examen.ConceptoAptitud}
-                                                </span>
-                                            </td>
-                                            <td className="action-buttons">
-                                                <button 
-                                                    className="btn btn-secondary"
-                                                    onClick={() => abrirModalVer(examen.ID_ExamenMedico)}
-                                                >
-                                                    Ver Detalle
-                                                </button>
-                                                <button 
-                                                    className="btn btn-icon"
-                                                    title="Generar Carta de Recomendaciones"
-                                                    onClick={() => handleGenerarPDF(examen)}
-                                                    disabled={isDownloading === examen.ID_ExamenMedico}
-                                                >
-                                                    <BsFileEarmarkPdfFill />
-                                                    {isDownloading === examen.ID_ExamenMedico ? '...' : 'PDF'}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    )}
+                <div className="modal-header">
+                    <h3>Generar PDF de Recomendaciones</h3>
+                    <button onClick={alCerrar} className="modal-close-button">&times;</button>
                 </div>
+
+                <form onSubmit={handleGenerar}>
+                    <div className="modal-body">
+                        
+                        <p style={{fontSize:'0.9rem', color:'#666', marginBottom: '1rem'}}>
+                            Vas a generar el documento para: <strong style={{color:'#005A5B'}}>{examen.NombreColaborador}</strong>
+                        </p>
+
+                        {/* --- SECCIÓN DE ENCABEZADO (La que no te aparecía) --- */}
+                        <div style={{backgroundColor: '#f0f7ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cce5ff'}}>
+                            <div style={{fontSize:'0.9rem', marginBottom:'15px', color:'#005A5B', display:'flex', alignItems:'center', gap:'8px', borderBottom:'1px solid #cce5ff', paddingBottom:'5px'}}>
+                                <BsCardHeading size={18} />
+                                <strong>Configuración del Encabezado</strong>
+                            </div>
+                            
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px'}}>
+                                {/* Código */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Código Doc</label>
+                                    <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleChange} required />
+                                </div>
+                                {/* Versión */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Versión</label>
+                                    <input className="form-control" name="version" value={headerData.version} onChange={handleChange} required />
+                                </div>
+                                {/* Fecha Emisión */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Emisión</label>
+                                    <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleChange} required />
+                                </div>
+                                {/* Fecha Revisión */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Revisión</label>
+                                    <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleChange} required />
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={alCerrar} disabled={isGenerating}>Cancelar</button>
+                        <button type="submit" className="btn btn-primary" disabled={isGenerating}>
+                            <BsFileEarmarkPdfFill /> {isGenerating ? 'Generando...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+                </form>
             </div>
-            
-            {/* --- Renderizado de Modales --- */}
-            {modalRegistroAbierto && (
-                <ModalRegistrarExamen
-                    alCerrar={() => setModalRegistroAbierto(false)}
-                    alExito={handleExamenRegistrado}
-                />
-            )}
-            
-            {modalVerAbierto && (
-                <ModalVerExamen
-                    examenId={examenSeleccionadoId}
-                    alCerrar={cerrarModalVer}
-                />
-            )}
         </div>
     );
 };
 
-export default MedicinaLaboralPage;
+export default ModalGenerarPdfMedico;

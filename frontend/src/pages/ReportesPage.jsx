@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getReportesMaquina, getReportesSeguridad } from '../services/reportService';
 import '../index.css'; 
-import '../style/PlanificacionPage.css'; // Reutiliza el estilo del filtro
+import '../style/PlanificacionPage.css'; 
 
 // --- Importamos los modales ---
 import ModalVerReporte from '../components/ModalVerReporte.jsx';
@@ -61,17 +61,20 @@ const ReportesPage = () => {
 
 
     // --- Manejadores de Modales ---
+    
     const abrirModalVer = (reporte, tipo) => {
         setReporteSeleccionado({ reporte, tipo });
         setModalVerAbierto(true);
     };
+
+    // --- CORRECCIÓN: Recargar tabla AL CERRAR el modal ---
     const cerrarModalVer = () => {
         setModalVerAbierto(false);
         setReporteSeleccionado(null);
-    };
-    const handleReporteRevisado = () => {
+        // Recargamos aquí para que el estado "Nuevo" cambie a "Revisado" visualmente
         cargarReportes(true); 
     };
+
     const abrirModalCrearACPM = (reporte, tipo) => {
         if (tipo === 'maquina') {
             setAcpmInitialData({
@@ -88,16 +91,16 @@ const ReportesPage = () => {
         }
         setModalCrearAcpmAbierto(true);
     };
+    
     const cerrarModalCrearACPM = () => {
         setModalCrearAcpmAbierto(false);
         setAcpmInitialData({});
     };
     
-    // Esta es la función que SÍ debe llamarse
     const handleAcpmCreada = (nuevoIdACPM) => {
         cerrarModalCrearACPM();
-        cargarReportes(true); // Recarga las tablas (para obtener el nuevo ID vinculado)
-        setModalVerAcpmId(nuevoIdACPM); // Opcional: abre el modal de "Ver"
+        cargarReportes(true); 
+        setModalVerAcpmId(nuevoIdACPM); 
     };
     
     const abrirModalVerACPM = (idACPM) => {
@@ -107,7 +110,6 @@ const ReportesPage = () => {
         setModalVerAcpmId(null);
     };
 
-    // Formatear la fecha
     const formatearFechaHora = (fechaISO) => {
         if (!fechaISO) return 'N/A';
         return new Date(fechaISO).toLocaleString('es-CO');
@@ -230,17 +232,21 @@ const ReportesPage = () => {
             )}
             
             {/* --- Renderizado de Modales --- */}
-            {modalVerAbierto && ( <ModalVerReporte reporte={reporteSeleccionado.reporte} tipo={reporteSeleccionado.tipo} alCerrar={cerrarModalVer} alExito={handleReporteRevisado} /> )}
+            {modalVerAbierto && ( 
+                <ModalVerReporte 
+                    reporte={reporteSeleccionado.reporte} 
+                    tipo={reporteSeleccionado.tipo} 
+                    alCerrar={cerrarModalVer} 
+                /> 
+            )}
             
-            {/* --- ESTA ES LA LÍNEA CORREGIDA --- */}
             {modalCrearAcpmAbierto && ( 
                 <ModalCrearACPM 
                     alCerrar={cerrarModalCrearACPM} 
-                    alExito={handleAcpmCreada} // <-- CORREGIDO
+                    alExito={handleAcpmCreada} 
                     initialData={acpmInitialData} 
                 /> 
             )}
-            {/* --- FIN DE LA CORRECCIÓN --- */}
 
             {modalVerAcpmId && ( <ModalVerACPM acpmId={modalVerAcpmId} alCerrar={cerrarModalVerACPM} /> )}
         </div>

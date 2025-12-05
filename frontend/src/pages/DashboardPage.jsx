@@ -4,8 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { getMisReportesMaquina, getMisReportesSeguridad } from '../services/reportService';
-import { getAdminKPIs, getAdminActividadesPendientes, getAdminReportesRecientes } from '../services/dashboardService';
-import ModalVerReporte from '../components/ModalVerReporte'; // <--- IMPORTANTE
+import { 
+    getAdminKPIs, 
+    getAdminActividadesPendientes, 
+    getAdminReportesRecientes,
+    getAdminActividadesEstado // <--- Importado
+} from '../services/dashboardService';
+import ModalVerReporte from '../components/ModalVerReporte';
+
+// Importaciones para Gráficas
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 import '../style/UsuariosPage.css';
 import '../style/DashboardColaborador.css'; 
@@ -147,10 +155,11 @@ const DashboardColaborador = ({ usuario }) => {
     );
 };
 
-// --- VISTA DEL ADMINISTRADOR (Sin cambios significativos, solo formato) ---
+// --- VISTA DEL ADMINISTRADOR (ACTUALIZADA CON GRÁFICA) ---
 const DashboardAdmin = ({ usuario }) => {
     const [kpis, setKpis] = useState(null);
     const [actividades, setActividades] = useState([]);
+    const [actividadesGrafica, setActividadesGrafica] = useState([]); // Nuevo Estado
     const [reportes, setReportes] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -161,17 +170,26 @@ const DashboardAdmin = ({ usuario }) => {
         return fecha.toLocaleDateString('es-CO');
     };
 
+    // Colores para la gráfica
+    const COLORES_GRAFICA = {
+        'Realizada': '#28a745',  // Verde
+        'Pendiente': '#f0ad4e',  // Naranja
+        'Cancelada': '#dc3545'   // Rojo
+    };
+
     useEffect(() => {
         const cargarDashboard = async () => {
             try {
                 setIsLoading(true);
-                const [dataKPIs, dataActividades, dataReportes] = await Promise.all([
+                const [dataKPIs, dataActividades, dataActividadesEstado, dataReportes] = await Promise.all([
                     getAdminKPIs(),
                     getAdminActividadesPendientes(),
+                    getAdminActividadesEstado(), // Cargar datos de la gráfica
                     getAdminReportesRecientes()
                 ]);
                 setKpis(dataKPIs);
                 setActividades(dataActividades);
+                setActividadesGrafica(dataActividadesEstado);
                 setReportes(dataReportes);
             } catch (err) {
                 console.error(err);
@@ -192,6 +210,7 @@ const DashboardAdmin = ({ usuario }) => {
                 <h1>Bienvenido, {usuario.nombre}</h1>
             </div>
 
+            {/* SECCIÓN 1: KPIs */}
             {kpis && (
                 <div className="kpi-grid">
                     <Link to="/inspecciones" className="kpi-card-link">
@@ -221,7 +240,40 @@ const DashboardAdmin = ({ usuario }) => {
                 </div>
             )}
 
-            <div className="dashboard-lists-grid">
+            {/* SECCIÓN 2: GRÁFICA Y LISTAS */}
+            <div className="dashboard-lists-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+                
+                {/* 1. Gráfica de Estado de Actividades */}
+                <div className="dashboard-list-card" style={{minHeight: '350px'}}>
+                    <h2><Link to="/planificacion">Estado de Actividades</Link></h2>
+                    <div style={{ width: '100%', height: 250 }}>
+                        {actividadesGrafica.length === 0 ? (
+                            <p style={{textAlign:'center', marginTop:'30%'}}>No hay datos de actividades.</p>
+                        ) : (
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie
+                                        data={actividadesGrafica}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {actividadesGrafica.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORES_GRAFICA[entry.name] || '#8884d8'} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend verticalAlign="bottom" height={36}/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                </div>
+
+                {/* 2. Lista de Actividades Pendientes */}
                 <div className="dashboard-list-card">
                     <h2><Link to="/planificacion">Actividades Pendientes</Link></h2>
                     {actividades.length === 0 ? (
@@ -238,6 +290,7 @@ const DashboardAdmin = ({ usuario }) => {
                     )}
                 </div>
 
+                {/* 3. Lista de Reportes Recientes */}
                 <div className="dashboard-list-card">
                     <h2><Link to="/reportes">Reportes Recientes</Link></h2>
                     {reportes.length === 0 ? (

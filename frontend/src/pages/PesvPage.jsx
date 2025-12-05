@@ -4,10 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { getConductoresPESV, getMantenimientos } from '../services/pesvService';
 import { getActivosTodos } from '../services/assetService';
 import '../index.css';
-// CORRECCIÓN: Se agregó BsPlusLg a la lista de importaciones
 import { 
     BsConeStriped, BsPersonBadge, BsTools, BsTruck, 
-    BsCheckCircle, BsPencilSquare, BsPersonPlusFill, BsEyeFill, BsPlusLg 
+    BsCheckCircle, BsPencilSquare, BsPersonPlusFill, BsEyeFill, BsPlusLg, BsInfoCircle 
 } from 'react-icons/bs';
 import Swal from 'sweetalert2';
 
@@ -16,6 +15,7 @@ import ModalGestionConductor from '../components/ModalGestionConductor';
 import ModalCrearMantenimiento from '../components/ModalCrearMantenimiento';
 import TabPasosPESV from '../components/TabPasosPESV'; 
 import ModalCrearUsuario from '../components/ModalCrearUsuario'; 
+import ModalVerMantenimiento from '../components/ModalVerMantenimiento'; // <--- IMPORTANTE
 
 const PesvPage = () => {
     // URL Base para abrir los documentos adjuntos
@@ -33,8 +33,12 @@ const PesvPage = () => {
     // Estados de Modales
     const [modalConductorOpen, setModalConductorOpen] = useState(false);
     const [conductorSelected, setConductorSelected] = useState(null);
-    const [modalMtoOpen, setModalMtoOpen] = useState(false);
     
+    // Modales de Mantenimiento
+    const [modalMtoOpen, setModalMtoOpen] = useState(false);
+    const [modalVerMtoOpen, setModalVerMtoOpen] = useState(false); // Estado para ver detalle
+    const [mtoSeleccionado, setMtoSeleccionado] = useState(null); // Mto seleccionado para ver
+
     // Estados para crear usuario (Flujo continuo)
     const [modalCrearUsuarioOpen, setModalCrearUsuarioOpen] = useState(false);
     const [usuarioPrellenado, setUsuarioPrellenado] = useState(null);
@@ -52,8 +56,8 @@ const PesvPage = () => {
             if (activeTab === 'conductores') {
                 const data = await getConductoresPESV();
                 setConductores(data);
-                setIsLoading(false); // Paramos carga aquí para retorno rápido
-                return data; // Retornamos data para el encadenamiento
+                setIsLoading(false); 
+                return data; 
             } 
             else if (activeTab === 'vehiculos') {
                 const allActivos = await getActivosTodos();
@@ -74,7 +78,7 @@ const PesvPage = () => {
         }
     };
 
-    // --- HELPERS Y MANEJADORES ---
+    // --- MANEJADORES DE CONDUCTORES ---
 
     const abrirEditarConductor = (c) => {
         setConductorSelected(c);
@@ -84,10 +88,9 @@ const PesvPage = () => {
     const handleConductorGuardado = () => {
         setModalConductorOpen(false);
         setConductorSelected(null);
-        cargarDatos(); // Recargar tabla
+        cargarDatos(); 
     };
     
-    // Abrir modal de creación con datos pre-llenados
     const abrirCrearUsuario = (c) => {
         setUsuarioPrellenado({
             NombreCompleto: c.NombreCompleto,
@@ -97,7 +100,6 @@ const PesvPage = () => {
         setModalCrearUsuarioOpen(true);
     };
 
-    // Flujo Continuo: Crear Usuario -> Abrir Gestión Automáticamente
     const handleUsuarioCreado = async (cedulaCreada) => {
         setModalCrearUsuarioOpen(false);
         setUsuarioPrellenado(null);
@@ -110,14 +112,10 @@ const PesvPage = () => {
             showConfirmButton: false
         });
 
-        // 1. Recargar datos frescos del backend
         const listaActualizada = await cargarDatos();
 
-        // 2. Buscar al usuario recién creado
         if (listaActualizada && cedulaCreada) {
             const nuevoConductor = listaActualizada.find(c => c.CedulaUsuario === cedulaCreada);
-            
-            // 3. Abrir automáticamente el modal de gestión
             if (nuevoConductor && nuevoConductor.ID_Usuario) {
                 setTimeout(() => {
                     abrirEditarConductor(nuevoConductor);
@@ -126,12 +124,20 @@ const PesvPage = () => {
         }
     };
 
+    // --- MANEJADORES DE MANTENIMIENTOS ---
+
     const handleMtoCreado = () => {
         setModalMtoOpen(false);
         cargarDatos(); 
     };
 
-    // Helper para verificar vencimientos
+    const abrirVerMto = (m) => {
+        setMtoSeleccionado(m);
+        setModalVerMtoOpen(true);
+    };
+
+    // --- HELPERS ---
+
     const isVencido = (fechaISO) => {
         if (!fechaISO) return false;
         const fecha = new Date(fechaISO).setHours(0,0,0,0);
@@ -139,10 +145,9 @@ const PesvPage = () => {
         return fecha < hoy;
     };
 
-    // Helper para abrir documento en pestaña nueva
     const abrirDocumento = (ruta) => {
         if (!ruta) return;
-        const rutaLimpia = ruta.replace(/\\/g, '/'); // Normalizar slashes
+        const rutaLimpia = ruta.replace(/\\/g, '/'); 
         const urlCompleta = `${API_BASE_URL}/${rutaLimpia}`;
         window.open(urlCompleta, '_blank');
     };
@@ -240,7 +245,6 @@ const PesvPage = () => {
                                                 <td style={{display: 'flex', gap: '5px'}}>
                                                     {c.ID_Usuario ? (
                                                         <>
-                                                            {/* BOTÓN GESTIONAR (Editar datos) */}
                                                             <button 
                                                                 className="btn btn-sm btn-secondary" 
                                                                 onClick={() => abrirEditarConductor(c)}
@@ -249,27 +253,18 @@ const PesvPage = () => {
                                                                 <BsPencilSquare /> Gestionar
                                                             </button>
 
-                                                            {/* BOTÓN VER DOCUMENTO (Solo si existe ruta) */}
                                                             {c.RutaLicencia && (
                                                                 <button 
                                                                     className="btn btn-sm"
                                                                     onClick={() => abrirDocumento(c.RutaLicencia)}
                                                                     title="Ver Licencia Adjunta"
-                                                                    style={{
-                                                                        backgroundColor: '#17a2b8', // Azul Cian
-                                                                        color: 'white', 
-                                                                        border: 'none',
-                                                                        display: 'flex', 
-                                                                        alignItems: 'center', 
-                                                                        justifyContent: 'center'
-                                                                    }}
+                                                                    style={{backgroundColor: '#17a2b8', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center'}}
                                                                 >
                                                                     <BsEyeFill />
                                                                 </button>
                                                             )}
                                                         </>
                                                     ) : (
-                                                        // BOTÓN CREAR USUARIO (Si no existe localmente)
                                                         <button 
                                                             className="btn btn-sm btn-primary" 
                                                             onClick={() => abrirCrearUsuario(c)}
@@ -356,11 +351,12 @@ const PesvPage = () => {
                                             <th>Descripción</th>
                                             <th>Taller</th>
                                             <th>Costo</th>
+                                            <th style={{textAlign: 'center'}}>Ver</th> {/* COLUMNA NUEVA */}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {mantenimientos.length === 0 ? (
-                                            <tr><td colSpan="6" style={{textAlign:'center'}}>No hay mantenimientos registrados.</td></tr>
+                                            <tr><td colSpan="7" style={{textAlign:'center'}}>No hay mantenimientos registrados.</td></tr>
                                         ) : (
                                             mantenimientos.map(m => (
                                                 <tr key={m.ID_Mantenimiento}>
@@ -371,9 +367,23 @@ const PesvPage = () => {
                                                             {m.TipoMantenimiento}
                                                         </span>
                                                     </td>
-                                                    <td>{m.Descripcion}</td>
+                                                    <td>{m.Descripcion.substring(0, 30)}...</td>
                                                     <td>{m.Taller_Realizo || 'Interno'}</td>
                                                     <td>${(m.Costo || 0).toLocaleString()}</td>
+                                                    <td style={{textAlign: 'center'}}>
+                                                        <button 
+                                                            className="btn btn-sm btn-secondary"
+                                                            onClick={() => abrirVerMto(m)}
+                                                            title="Ver Detalle y Evidencia"
+                                                            style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '5px'
+                                                            }}
+                                                        >
+                                                            <BsInfoCircle /> Detalle
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             ))
                                         )}
@@ -407,6 +417,14 @@ const PesvPage = () => {
                     alCerrar={() => setModalCrearUsuarioOpen(false)} 
                     alExito={handleUsuarioCreado} 
                     initialData={usuarioPrellenado} 
+                />
+            )}
+
+            {/* MODAL DE VER DETALLE (NUEVO) */}
+            {modalVerMtoOpen && (
+                <ModalVerMantenimiento 
+                    mantenimiento={mtoSeleccionado} 
+                    alCerrar={() => setModalVerMtoOpen(false)} 
                 />
             )}
         </div>

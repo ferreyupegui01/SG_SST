@@ -2,45 +2,98 @@
 
 .header-container {
     display: flex;
-    justify-content: flex-end; /* Alinea todo a la derecha */
+    justify-content: flex-end; /* Alinea todo a la derecha por defecto */
     align-items: center;
     padding: 1rem 2rem;
-    height: 70px; /* Altura fija del header */
+    height: 70px;
     background-color: #FFFFFF;
-    border-bottom: 1px solid #dee2e6; /* Borde sutil */
+    border-bottom: 1px solid #dee2e6;
+    position: relative; /* Necesario para elementos absolutos hijos */
+    gap: 1rem; /* Espacio entre el botón menú y el resto */
 }
 
+/* --- BOTÓN DE MENÚ (HAMBURGUESA) --- */
+.header-toggle-btn {
+    display: none; /* Oculto por defecto en Desktop */
+    background: transparent;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--color-primario); /* Verde corporativo */
+    cursor: pointer;
+    padding: 5px;
+    margin-right: auto; /* Empuja el resto a la derecha en flexbox */
+}
+
+/* Placeholder para empujar contenido */
+.header-title-placeholder {
+    flex-grow: 1;
+}
+
+/* --- LOGO --- */
+.sidebar-logo-img3 {
+    width: 160px;
+    height: auto; 
+    position: absolute;
+    left: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+/* --- SECCIÓN DERECHA --- */
 .header-user-info {
     display: flex;
     align-items: center;
-    color: #6c757d; /* Gris para "Bienvenido" */
+    color: #6c757d;
 }
 
-.header-user-info .user-name {
-    margin: 0 0.5rem 0 0.25rem;
-    color: #212529; /* Texto oscuro */
+/* Separador Vertical */
+.header-separator {
+    width: 1px;
+    height: 25px;
+    background: #dee2e6;
+    margin: 0 1rem;
+}
+
+/* Detalles de Texto (Nombre y Rol) */
+.user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-right: 0.8rem;
+    text-align: right;
+}
+
+.user-name {
+    font-size: 0.9rem;
     font-weight: 600;
+    color: #333;
 }
 
-.header-user-info .user-avatar {
+.user-role {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Avatar Circular */
+.user-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #007BFF; /* Color acento */
+    background-color: #007BFF;
     color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
     font-size: 1.2rem;
-    margin-left: 0.5rem;
+    flex-shrink: 0; /* No encoger */
 }
 
-
-
+/* Botón Logout */
 .header-logout-button {
     background: transparent;
-    border: 1px solid #dc3545; /* Rojo */
+    border: 1px solid #dc3545;
     color: #dc3545;
     padding: 0.4rem 0.8rem;
     margin-left: 1.5rem;
@@ -49,24 +102,80 @@
     font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
+
 .header-logout-button:hover {
     background-color: #dc3545;
     color: white;
 }
 
-.sidebar-logo-img3 {
-    width: 160px; /* Ancho que especificaste */
-    height: auto; 
-    margin-top: -2rem;
-    position: absolute;
-    left: 2%;
-    /* CORRECCIÓN: Espacio mínimo entre logo y texto */
-    margin-bottom: -2.5rem; /* Pega el texto al logo */
+.logout-icon {
+    display: none; /* Oculto en desktop */
+    font-size: 1.2rem;
+    line-height: 1;
 }
 
-.nombreEmpresa{
-    position: absolute;
-    left: 13%;
-    /* color: #000; */
+/* =========================================
+   RESPONSIVE DESIGN (Móviles y Tablets)
+   ========================================= */
+@media (max-width: 992px) { /* Coincide con el breakpoint del Sidebar */
+    .header-container {
+        padding: 0.5rem 1rem;
+        height: 60px;
+        justify-content: space-between; 
+    }
+
+    /* Mostrar el botón de hamburguesa en Tablet/Móvil */
+    .header-toggle-btn {
+        display: block; 
+    }
+
+    /* 1. Logo en Móvil: Más pequeño y estático */
+    .sidebar-logo-img3 {
+        position: static; 
+        transform: none;
+        width: 100px;
+        margin: 0;
+        display: block;
+    }
+
+    /* Ocultar placeholder */
+    .header-title-placeholder {
+        display: none;
+    }
+
+    /* 2. Ajustar espacio de elementos derechos */
+    .header-user-info {
+        gap: 0.5rem;
+    }
+
+    /* 3. Ocultar Separador y Texto de Nombre en pantallas muy chicas */
+    .header-separator,
+    .user-details {
+        display: none; 
+    }
+
+    /* 4. Ajustar Botón de Logout */
+    .header-logout-button {
+        margin-left: 0.5rem;
+        padding: 0.3rem 0.6rem;
+        border: none; 
+    }
+    
+    .header-logout-button .logout-text {
+        display: none; 
+    }
+    .logout-icon {
+        display: block; 
+    }
+    
+    /* 5. Avatar un poco más pequeño */
+    .user-avatar {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
 }

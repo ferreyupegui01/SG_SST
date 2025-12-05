@@ -33,6 +33,21 @@ const getAdminActividadesPendientes = async (req, res) => {
 };
 
 /**
+ * @controller  getAdminActividadesEstado
+ * @desc        Obtiene el conteo de actividades por estado para la gráfica
+ */
+const getAdminActividadesEstado = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('EXEC SP_GET_Dashboard_Actividades_Estado');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error en getAdminActividadesEstado:', err.message);
+        res.status(500).send('Error del servidor');
+    }
+};
+
+/**
  * @controller  getAdminReportesRecientes
  * @desc        Obtiene la lista Top 5 de reportes nuevos
  */
@@ -47,8 +62,6 @@ const getAdminReportesRecientes = async (req, res) => {
     }
 };
 
-
-
 /**
  * @controller  getSuperAdminData
  * @desc        Obtiene toda la data para el dashboard del Super Admin
@@ -58,7 +71,6 @@ const getSuperAdminData = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query('EXEC SP_GET_SuperAdmin_Dashboard');
         
-        // El SP devuelve 3 tablas (recordsets)
         const kpis = result.recordsets[0][0];       // Tabla 1: KPIs
         const grafica = result.recordsets[1];       // Tabla 2: Datos Gráfica
         const logs = result.recordsets[2];          // Tabla 3: Logs Recientes
@@ -74,11 +86,10 @@ const getSuperAdminData = async (req, res) => {
     }
 };
 
-
-
 const dashboardController = {
     getAdminKPIs,
     getAdminActividadesPendientes,
+    getAdminActividadesEstado, // <--- NUEVO
     getAdminReportesRecientes,
     getSuperAdminData
 };

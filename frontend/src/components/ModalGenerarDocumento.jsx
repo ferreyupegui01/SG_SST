@@ -4,26 +4,43 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../services/apiService';
 import '../style/Modal.css';
 import Swal from 'sweetalert2';
-import { BsCheckCircle, BsDownload, BsEye, BsXCircle, BsFileText } from 'react-icons/bs';
+import { BsCheckCircle, BsDownload, BsEye, BsFileText, BsCardHeading } from 'react-icons/bs';
 
 const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
-    const [plantilla, setPlantilla] = useState(null); // Aquí guardamos la estructura
-    const [respuestas, setRespuestas] = useState({}); // Aquí lo que escribe el usuario
+    const [plantilla, setPlantilla] = useState(null); 
+    const [respuestas, setRespuestas] = useState({}); 
+    
+    // --- NUEVO: Estado para datos del encabezado ---
+    const [headerData, setHeaderData] = useState({
+        codigo: '',
+        version: '',
+        fechaEmision: '',
+        fechaRevision: ''
+    });
+
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [pdfGenerado, setPdfGenerado] = useState(null); 
 
     const API_URL = 'http://localhost:5000'; 
 
-    // 1. AL ABRIR, CARGAMOS LA PLANTILLA DE LA BD
     useEffect(() => {
         const cargarPlantilla = async () => {
             try {
                 const data = await apiFetch(`/pesv/plantilla/${paso.ID_Paso}`);
                 if (data.existe) {
                     setPlantilla(data);
+                    
+                    // Pre-llenar con lo que está configurado en BD
+                    setHeaderData({
+                        codigo: data.config.CodigoDocumento || `PESV-FTO-${paso.NumeroPaso}`,
+                        version: data.config.Version || '1',
+                        fechaEmision: data.config.FechaEmision ? data.config.FechaEmision.split('T')[0] : new Date().toISOString().split('T')[0],
+                        fechaRevision: data.config.FechaRevision ? data.config.FechaRevision.split('T')[0] : new Date().toISOString().split('T')[0]
+                    });
+
                 } else {
-                    setPlantilla(null); // No hay plantilla para este paso
+                    setPlantilla(null); 
                 }
             } catch (error) {
                 console.error(error);
@@ -39,6 +56,11 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
         setRespuestas({ ...respuestas, [label]: valor });
     };
 
+    // Manejador para los campos del encabezado
+    const handleHeaderChange = (e) => {
+        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
+    };
+
     const handleGenerar = async (e) => {
         e.preventDefault();
         setIsGenerating(true);
@@ -47,7 +69,8 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                 method: 'POST',
                 body: JSON.stringify({
                     idPaso: paso.ID_Paso,
-                    datosFormulario: respuestas // Enviamos el objeto dinámico { "Nombre": "Juan", ... }
+                    datosFormulario: respuestas,
+                    headerData: headerData // Enviamos los datos editados del encabezado
                 })
             });
             
@@ -61,8 +84,7 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                 showConfirmButton: false
             });
             
-            if (alExito) alExito(); 
-
+            if (alExito) alExito();
         } catch (error) {
             Swal.fire('Error', error.message, 'error');
         } finally {
@@ -70,7 +92,6 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
         }
     };
 
-    // --- RENDERIZADO DINÁMICO ---
     const renderFormulario = () => {
         if (isLoading) return <p>Cargando estructura...</p>;
         
@@ -79,13 +100,40 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                 <div style={{textAlign:'center', padding:'2rem', color:'#666', backgroundColor:'#f8f9fa', borderRadius:'8px'}}>
                     <BsFileText style={{fontSize:'2rem', marginBottom:'10px', opacity:0.5}}/>
                     <p>Este paso aún no tiene una plantilla automática configurada.</p>
-                    <p style={{fontSize:'0.85rem'}}>Por favor, use el botón "Gestionar" para subir el archivo manualmente.</p>
+                    <p style={{fontSize:'0.85rem'}}>Por favor, contacte al Administrador para configurar el formato.</p>
                 </div>
             );
         }
 
         return (
             <form onSubmit={handleGenerar}>
+                
+                {/* --- SECCIÓN DE ENCABEZADO EDITABLE --- */}
+                <div style={{backgroundColor: '#f0f7ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cce5ff'}}>
+                    <h4 style={{marginTop: 0, fontSize: '0.9rem', color: '#005A5B', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                        <BsCardHeading /> Información del Documento
+                    </h4>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Código:</label>
+                            <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleHeaderChange} required />
+                        </div>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Versión:</label>
+                            <input className="form-control" name="version" value={headerData.version} onChange={handleHeaderChange} required />
+                        </div>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Fecha Emisión:</label>
+                            <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleHeaderChange} required />
+                        </div>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Fecha Revisión:</label>
+                            <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleHeaderChange} required />
+                        </div>
+                    </div>
+                </div>
+                
+                {/* --- HEADER VISUAL --- */}
                 <div className="form-header-box">
                     <BsFileText />
                     <div>
@@ -94,7 +142,7 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                     </div>
                 </div>
 
-                {/* DIBUJAR INPUTS SEGÚN LA BD */}
+                {/* --- CAMPOS DINÁMICOS --- */}
                 {plantilla.campos.map((campo) => (
                     <div key={campo.ID_Campo} className="form-group">
                         <label>{campo.Etiqueta}</label>
@@ -131,12 +179,12 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
             <div className="modal-content modal-lg" style={{maxWidth: '650px'}} onClick={e => e.stopPropagation()}>
                 
                 <div className="modal-header">
-                    <h3>{pdfGenerado ? 'Documento Listo' : `Paso ${paso.NumeroPaso}: Generar Documento`}</h3>
+                    <h3>{pdfGenerado ? 'Documento Listo' : `Generar: Paso ${paso.NumeroPaso}`}</h3>
                     <button onClick={alCerrar} className="modal-close-button">&times;</button>
                 </div>
                 
                 {!pdfGenerado ? (
-                    <div className="modal-body">
+                    <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
                         {renderFormulario()}
                     </div>
                 ) : (

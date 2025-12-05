@@ -4,7 +4,6 @@ import express from 'express';
 import { check } from 'express-validator';
 import medicalController from '../controllers/medicalController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
-
 const router = express.Router();
 
 // GET /api/medicina (Historial)
@@ -28,19 +27,15 @@ router.post(
     medicalController.crearExamenMedico
 );
 
-/**
- * @route   GET /api/medicina/:id
- * @desc    Obtener detalle de UN examen (para el modal "Ver Detalle")
- * @access  Privado (Admin)
- */
+// GET /api/medicina/:id (Obtener detalle)
 router.get(
     '/:id',
     [ protect, admin ],
-    medicalController.getExamenMedicoDetalle // <-- ¡CORREGIDO!
+    medicalController.getExamenMedicoDetalle 
 );
 
-// GET /api/medicina/:id/pdf (Generar PDF)
-router.get(
+// --- CAMBIO AQUÍ: POST en lugar de GET para recibir datos del encabezado ---
+router.post(
     '/:id/pdf',
     [ protect, admin ],
     medicalController.generarPdfRecomendaciones 

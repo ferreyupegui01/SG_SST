@@ -472,3 +472,65 @@ body, #root {
     margin-bottom: 1rem;
     color: #dee2e6;
 }
+
+
+
+/* ... (Todo el código anterior) ... */
+
+/* ==========================================================================
+   11. MEJORAS RESPONSIVE PARA CONTENIDO INTERNO
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    /* 1. Ajustar fuentes generales */
+    html {
+        font-size: 14px; /* Reduce ligeramente el tamaño base */
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem; /* Títulos más pequeños */
+    }
+
+    /* 2. Tablas: Ajustes para scroll y legibilidad */
+    .data-table th, .data-table td {
+        padding: 0.75rem 0.5rem; /* Menos relleno en celdas */
+        font-size: 0.85rem;
+    }
+    
+    /* Forzar scroll suave en tablas */
+    .table-wrapper {
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1rem;
+    }
+
+    /* 3. Botones de acción en tablas */
+    .action-buttons {
+        flex-direction: row; /* Mantener en fila si caben */
+        flex-wrap: wrap; /* Permitir bajar si no caben */
+        gap: 5px;
+    }
+    .action-buttons .btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+    }
+
+    /* 4. Ajustes para tarjetas de Dashboard */
+    .dashboard-lists-grid {
+        grid-template-columns: 1fr !important; /* Forzar una sola columna */
+    }
+    
+    .kpi-grid {
+        grid-template-columns: 1fr 1fr; /* 2 columnas en tablets/móviles grandes */
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    /* En celulares muy pequeños, KPIs en una sola columna */
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Ocultar columnas menos importantes en tablas si fuera necesario, 
+       o confiar en el scroll horizontal (que ya tienes configurado). */
+}

@@ -161,3 +161,66 @@
     display: block;
     color: #6c757d;
 }
+
+/* ... (Mantén todo el código anterior hasta .modal-footer) ... */
+
+/* AGREGAR AL FINAL DEL ARCHIVO: */
+
+/* =========================================
+   RESPONSIVE MODALES
+   ========================================= */
+
+@media (max-width: 768px) {
+    /* 1. Caja del Modal: Más ancha y alta en móvil */
+    .modal-content, 
+    .modal-content.modal-lg {
+        width: 95% !important;
+        max-width: 95% !important;
+        max-height: 90vh !important; /* Evitar que se salga de la pantalla */
+        padding: 1.2rem !important; /* Menos relleno interno */
+        margin: 0 auto;
+    }
+
+    /* 2. Encabezado */
+    .modal-header h2, 
+    .modal-header h3 {
+        font-size: 1.2rem; /* Título más pequeño */
+    }
+
+    /* 3. Formularios: FORZAR COLUMNA ÚNICA */
+    /* Este truco hace que los divs con display: flex dentro del modal se vuelvan columna */
+    .modal-body div[style*="display: flex"], 
+    .modal-body div[style*="display:flex"] {
+        flex-direction: column !important;
+        gap: 1rem !important;
+    }
+    
+    /* Excepción: Los radio buttons o checkboxes pequeños no deben apilarse */
+    .modal-body div[style*="display: flex"] label,
+    .modal-body div[style*="display:flex"] label {
+        margin-bottom: 0;
+    }
+    
+    /* Excepción: Las listas de evidencias o filas pequeñas */
+    .evidence-item {
+        flex-direction: row !important; /* Mantener icono y texto lado a lado */
+    }
+
+    /* 4. Inputs y Selects */
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: 16px; /* Evita zoom automático en iPhone al escribir */
+        padding: 0.7rem;
+    }
+
+    /* 5. Footer (Botones) */
+    .modal-footer {
+        flex-direction: column-reverse; /* Botón principal arriba, cancelar abajo */
+        gap: 0.8rem;
+    }
+    .modal-footer button {
+        width: 100%; /* Botones ancho completo */
+        padding: 0.9rem;
+    }
+}
