@@ -5,7 +5,7 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import path from 'path'; 
 import { fileURLToPath } from 'url';
 import { logAction } from '../services/logService.js';
-import { crearNotificacion } from '../services/notificationService.js'; // Servicio de Notificaciones
+import { crearNotificacion } from '../services/notificationService.js'; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,20 +32,19 @@ const crearReporteMaquina = async (req, res) => {
             .input('kilometraje', mssql.Int, kilometraje || null)
             .query('EXEC SP_CREATE_ReporteMaquina @idActivo, @idUsuarioReporta, @estadoReportado, @descripcionProblema, @rutaFotoAdjunta, @datosReporte, @kilometraje');
 
-        // 2. Obtener nombre del activo para la notificación (Consulta rápida)
+        // 2. Obtener nombre del activo para la notificación
         const activoResult = await pool.request().input('id', mssql.Int, idActivo).query('SELECT NombreDescriptivo FROM ActivosInspeccionables WHERE ID_Activo = @id');
         const nombreEquipo = activoResult.recordset[0]?.NombreDescriptivo || 'Equipo';
 
-        // --- NOTIFICACIÓN: REPORTE DE MÁQUINA ---
+        // --- NOTIFICACIÓN ---
         if (estadoReportado === 'Con Problema') {
             await crearNotificacion({
-                rolDestino: 'Administrador SST', // También podrías enviar a 'Mantenimiento' si existiera el rol
-                titulo: `🔴 Falla Reportada: ${nombreEquipo}`,
+                rolDestino: 'Administrador SST', 
+                titulo: `Falla Reportada: ${nombreEquipo}`,
                 mensaje: `El equipo ${nombreEquipo} reporta fallas. Revisar urgente. Reportado por: ${req.usuario.nombre}`,
                 ruta: '/reportes'
             });
         }
-        // ----------------------------------------
 
         res.status(201).json({ msg: 'Reporte enviado exitosamente' });
     } catch (err) {
@@ -75,8 +74,7 @@ const crearReporteSeguridad = async (req, res) => {
             .input('rutaFotoAdjunta', mssql.NVarChar, archivoFoto) 
             .query('EXEC SP_CREATE_ReporteSeguridad @idUsuarioReporta, @tipoReporte, @ubicacionArea, @descripcion, @rutaFotoAdjunta');
 
-        // --- NOTIFICACIÓN: REPORTE SEGURIDAD ---
-        // Se notifica a SST y Super Admin
+        // --- NOTIFICACIÓN ---
         const mensajeAlerta = `⚠️ Nuevo reporte de seguridad en ${ubicacionArea}. Tipo: ${tipoReporte}.`;
         
         await crearNotificacion({
@@ -92,7 +90,6 @@ const crearReporteSeguridad = async (req, res) => {
             mensaje: mensajeAlerta,
             ruta: '/reportes'
         });
-        // ---------------------------------------
 
         res.status(201).json({ msg: 'Reporte de seguridad enviado exitosamente' });
     } catch (err) {
@@ -125,7 +122,9 @@ const getReportesSeguridad = async (req, res) => {
 
 const getReporteMaquinaDetalle = async (req, res) => {
     const { id: idReporte } = req.params;
-    const esAdmin = ['Administrador SST', 'Super Admin', 'Gestion de Calidad'].includes(req.usuario.rol);
+    
+    // --- CAMBIO: Se eliminó 'Gestion de Calidad' ---
+    const esAdmin = ['Administrador SST', 'Super Admin'].includes(req.usuario.rol);
     const marcarRevisado = esAdmin ? 1 : 0;
 
     try {
@@ -151,7 +150,9 @@ const getReporteMaquinaDetalle = async (req, res) => {
 
 const getReporteSeguridadDetalle = async (req, res) => {
     const { id: idReporte } = req.params;
-    const esAdmin = ['Administrador SST', 'Super Admin', 'Gestion de Calidad'].includes(req.usuario.rol);
+    
+    // --- CAMBIO: Se eliminó 'Gestion de Calidad' ---
+    const esAdmin = ['Administrador SST', 'Super Admin'].includes(req.usuario.rol);
     const marcarRevisado = esAdmin ? 1 : 0;
 
     try {

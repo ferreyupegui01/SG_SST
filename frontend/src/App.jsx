@@ -22,12 +22,10 @@ import SolicitudesPage from './pages/SolicitudesPage.jsx';
 import ReportarMaquinaPage from './pages/ReportarMaquinaPage.jsx'; 
 import ReportarSeguridadPage from './pages/ReportarSeguridadPage.jsx';
 import DashboardSuperAdmin from './pages/DashboardSuperAdmin';
-import DashboardCalidad from './pages/DashboardCalidad';
 import GestionFormulariosPage from './pages/GestionFormulariosPage'; 
 import DirectorioExternoPage from './pages/DirectorioExternoPage';
 import ActasPage from './pages/ActasPage.jsx'; 
 import PresupuestoPage from './pages/PresupuestoPage.jsx';
-// --- IMPORTACIÓN NUEVA ---
 import HistorialPage from './pages/HistorialPage.jsx';
 
 // Layouts
@@ -37,20 +35,14 @@ import ProtectedRoutes from './components/ProtectedRoutes';
 
 const AdminRoutes = () => {
     const { usuario } = useAuth();
-    // Esta ruta incluye a todos los perfiles de gestión
-    const tieneAcceso = usuario.rol === 'Super Admin' || usuario.rol === 'Administrador SST' || usuario.rol === 'Gestion de Calidad';
+    // CAMBIO: Se eliminó Gestión de Calidad
+    const tieneAcceso = usuario.rol === 'Super Admin' || usuario.rol === 'Administrador SST';
     return tieneAcceso ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
 
 const SuperAdminRoutes = () => {
     const { usuario } = useAuth();
     return usuario.rol === 'Super Admin' ? <Outlet /> : <Navigate to="/dashboard" replace />;
-};
-
-const CalidadRoutes = () => {
-    const { usuario } = useAuth();
-    const tienePermiso = usuario.rol === 'Gestion de Calidad' || usuario.rol === 'Super Admin';
-    return tienePermiso ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
 
 function App() {
@@ -68,7 +60,7 @@ function App() {
     const getDefaultRoute = () => {
         if (!usuario) return "/login";
         if (usuario.rol === 'Super Admin') return "/super-admin/dashboard";
-        if (usuario.rol === 'Gestion de Calidad') return "/calidad/dashboard";
+        // CAMBIO: Se eliminó la ruta de Calidad
         if (usuario.rol === 'Administrador SST') return "/dashboard";
         if (usuario.rol === 'Colaborador') return "/dashboard"; 
         return "/login";
@@ -87,7 +79,7 @@ function App() {
                     
                     <Route path="dashboard" element={
                         usuario?.rol === 'Super Admin' ? <Navigate to="/super-admin/dashboard" replace /> :
-                        usuario?.rol === 'Gestion de Calidad' ? <Navigate to="/calidad/dashboard" replace /> :
+                        // CAMBIO: Se eliminó la redirección a Calidad
                         <DashboardPage /> 
                     } />
                     
@@ -97,12 +89,7 @@ function App() {
                         <Route path="formularios" element={<GestionFormulariosPage />} />
                     </Route>
 
-                    {/* CALIDAD */}
-                    <Route path="calidad" element={<CalidadRoutes />}>
-                         <Route path="dashboard" element={<DashboardCalidad />} />
-                    </Route>
-
-                    {/* GESTIÓN Y ADMINISTRACIÓN (RUTAS COMPARTIDAS) */}
+                    {/* GESTIÓN Y ADMINISTRACIÓN (RUTAS COMPARTIDAS SUPER ADMIN Y ADMIN SST) */}
                     <Route element={<AdminRoutes />}>
                         <Route path="usuarios" element={<UsuariosPage />} />
                         <Route path="directorio" element={<DirectorioExternoPage />} />
@@ -120,8 +107,6 @@ function App() {
                         <Route path="logs" element={<LogsPage />} />
                         <Route path="actas" element={<ActasPage />} />
                         <Route path="presupuesto" element={<PresupuestoPage />} />
-                        
-                        {/* --- RUTA NUEVA --- */}
                         <Route path="historial" element={<HistorialPage />} />
                     </Route>
 

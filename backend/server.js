@@ -6,6 +6,8 @@ import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initCronJobs } from './services/cronService.js';
+import { verificarConexionCorreo } from './config/mailer.js'; // <--- NUEVO
+
 // --- Importación de Rutas (ESM) ---
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -34,14 +36,12 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 5000;
 
-
-
 // --- Middlewares ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); 
 
-// --- Middleware de Archivos Estáticos (Corregido) ---
+// --- Middleware de Archivos Estáticos ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- Definición de Rutas de la API ---
@@ -52,7 +52,7 @@ app.use('/api/actividades', activityRoutes);
 app.use('/api/inspecciones', inspectionRoutes);
 app.use('/api/reportes', reportRoutes);
 app.use('/api/acpm', acpmRoutes); 
-app.use('/api/activos', assetRoutes); // <--- AÑADE ESTA LÍNEA
+app.use('/api/activos', assetRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/documentos', documentRoutes);
 app.use('/api/medicina', medicalRoutes);
@@ -66,8 +66,10 @@ app.use('/api/actas', committeeRoutes);
 app.use('/api/presupuesto', budgetRoutes);
 app.use('/api/historial', historyRoutes);
 
+// --- Inicializadores ---
 initCronJobs();
+verificarConexionCorreo(); // <--- INICIALIZAR CORREO
 
 app.listen(port, () => {
-    console.log(`Servidor corriendo exitosamente en el puerto ${port}`);
+    console.log(`🚀 Servidor corriendo exitosamente en el puerto ${port}`);
 });

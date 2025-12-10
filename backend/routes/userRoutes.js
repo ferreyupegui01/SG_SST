@@ -93,4 +93,11 @@ router.patch(
     userController.resetPasswordColaborador
 );
 
+// 11. ACTUALIZAR EMAIL (PERFIL)
+router.patch(
+    '/perfil/email',
+    [ protect ], // Cualquier usuario logueado puede actualizar su email
+    userController.actualizarPerfilEmail
+);
+
 export default router;

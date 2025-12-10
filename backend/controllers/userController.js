@@ -13,14 +13,9 @@ const buscarDirectorioExterno = async (req, res) => {
     try {
         const resultados = await buscarEnDirectorioExterno(query);
         
-        // DEBUG: Descomenta esto si sigues teniendo problemas para ver qué llega
-        // if(resultados.length > 0) console.log("Estado Raw del primero:", resultados[0].EstadoContrato);
-
         const datosFormateados = resultados.map(u => {
-            
             // 1. DETECCIÓN DE ESTADO (Más permisiva)
             const estadoRaw = u.EstadoContrato;
-            // Consideramos activo si es el número 1, el string "1" o true booleano
             const esActivo = (estadoRaw == 1 || estadoRaw === true || String(estadoRaw).trim() === '1');
 
             // Helper para fecha
@@ -28,7 +23,6 @@ const buscarDirectorioExterno = async (req, res) => {
                 if (!f) return null;
                 const fechaObj = new Date(f);
                 if (isNaN(fechaObj.getTime())) return null;
-                // Sumar 5 horas para compensar UTC si es necesario
                 const userTimezoneOffset = fechaObj.getTimezoneOffset() * 60000;
                 const fechaCompensada = new Date(fechaObj.getTime() + userTimezoneOffset);
                 return fechaCompensada.toLocaleDateString('es-CO');
@@ -38,14 +32,12 @@ const buscarDirectorioExterno = async (req, res) => {
             const fechaFinStr = formatearFecha(u.FechaFin);
             const fechaTerminacionStr = formatearFecha(u.FechaTerminacion);
 
-            // 2. LÓGICA DE FECHAS (Según tu requerimiento)
+            // 2. LÓGICA DE FECHAS
             let textoFecha = '---';
 
             if (esActivo) {
-                // CASO ACTIVO: SIEMPRE FECHA INICIO
                 textoFecha = fechaInicioStr ? `Inicio: ${fechaInicioStr}` : 'Activo (Sin fecha inicio)';
             } else {
-                // CASO INACTIVO: FECHA FIN (Preferimos Terminación real, si no Fin Contrato)
                 if (fechaTerminacionStr) {
                     textoFecha = `Fin: ${fechaTerminacionStr}`;
                 } else if (fechaFinStr) {
@@ -59,10 +51,8 @@ const buscarDirectorioExterno = async (req, res) => {
                 Nombre: u.NombreCompleto,
                 Cedula: u.Cedula,
                 Cargo: u.CargoNombre || 'Sin asignar',
-                Area: u.CentroCosto || 'No definido', // Aquí va el nombre del Centro de Costo
+                Area: u.CentroCosto || 'No definido',
                 Email: u.Email || 'No registrado',
-                
-                // Estos campos los usa el Frontend para pintar verde/rojo
                 Estado: esActivo ? 'Activo' : 'Inactivo',
                 FechaRelevante: textoFecha
             };
@@ -237,6 +227,31 @@ const getCargosEmpresa = async (req, res) => {
     }
 };
 
+// --- NUEVA FUNCIÓN: ACTUALIZAR PERFIL (EMAIL) ---
+const actualizarPerfilEmail = async (req, res) => {
+    const { email } = req.body;
+    const idUsuario = req.usuario.id; // Del token
+
+    // Validación básica de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ msg: 'Formato de correo inválido.' });
+    }
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('idUsuario', mssql.Int, idUsuario)
+            .input('email', mssql.NVarChar, email)
+            .query('EXEC SP_UPDATE_EmailUsuario @idUsuario, @email');
+
+        res.json({ msg: 'Correo actualizado exitosamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error al actualizar perfil');
+    }
+};
+
 const userController = {
     buscarDirectorioExterno, 
     crearColaborador,
@@ -247,7 +262,8 @@ const userController = {
     editarColaborador,
     cambiarEstadoColaborador,
     resetPasswordColaborador,
-    getCargosEmpresa
+    getCargosEmpresa,
+    actualizarPerfilEmail // <--- AGREGAR
 };
 
 export default userController;

@@ -15,6 +15,8 @@ const login = async (req, res) => {
 
     try {
         const pool = await poolPromise;
+        
+        // Ejecutamos el SP modificado (asegúrate de haber corrido el script SQL del paso anterior)
         const result = await pool.request()
             .input('cedula', mssql.NVarChar, cedula)
             .query('EXEC SP_AUTH_LoginUsuario @cedula');
@@ -34,13 +36,14 @@ const login = async (req, res) => {
             return res.status(401).json({ msg: 'Credenciales inválidas' });
         }
 
-        // --- AQUÍ AGREGAMOS LA CÉDULA AL TOKEN ---
+        // --- CREACIÓN DEL PAYLOAD DEL TOKEN ---
         const payload = {
             usuario: {
                 id: usuario.ID_Usuario,
                 nombre: usuario.NombreCompleto,
                 rol: usuario.NombreRol,
-                cedula: usuario.CedulaUsuario // <--- ¡ESTO FALTABA!
+                cedula: usuario.CedulaUsuario,
+                email: usuario.Email // <--- ¡AQUÍ ESTABA EL ERROR! Ahora el token recordará el correo
             }
         };
 

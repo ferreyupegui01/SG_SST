@@ -1,4 +1,4 @@
-CONTEXTO DEL PROYECTO (FECHA: 2025-12-09T12:55:47.900Z):
+CONTEXTO DEL PROYECTO (FECHA: 2025-12-10T12:39:05.348Z):
 
 
 ==================================================================
@@ -815,6 +815,141 @@ export default authController;
 
 
 ==================================================================
+ARCHIVO: backend\controllers\budgetController.js
+==================================================================
+// backend/controllers/budgetController.js
+import { poolPromise, mssql } from '../config/dbConfig.js';
+import path from 'path';
+
+// --- Crear Presupuesto (Super Admin) ---
+const crearPresupuesto = async (req, res) => {
+    const { nombreRubro, descripcion, montoAsignado, anio } = req.body;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('NombreRubro', mssql.NVarChar, nombreRubro)
+            .input('Descripcion', mssql.NVarChar, descripcion)
+            .input('MontoAsignado', mssql.Decimal(18, 2), montoAsignado)
+            .input('Anio', mssql.Int, anio)
+            .query('EXEC SP_CREATE_Presupuesto @NombreRubro, @Descripcion, @MontoAsignado, @Anio');
+        
+        res.json({ msg: 'Presupuesto asignado correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error al crear presupuesto');
+    }
+};
+
+// --- Registrar Gasto (Admin SST) ---
+const registrarGasto = async (req, res) => {
+    const { idPresupuesto, descripcionGasto, montoGastado, fechaGasto } = req.body;
+    const archivo = req.file; // Evidencia
+    const idUsuario = req.usuario.id;
+
+    try {
+        const rutaEvidencia = archivo ? archivo.path.replace(/\\/g, '/') : null;
+
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID_Presupuesto', mssql.Int, idPresupuesto)
+            .input('DescripcionGasto', mssql.NVarChar, descripcionGasto)
+            .input('MontoGastado', mssql.Decimal(18, 2), montoGastado)
+            .input('FechaGasto', mssql.Date, fechaGasto)
+            .input('RutaEvidencia', mssql.NVarChar, rutaEvidencia)
+            .input('ID_UsuarioRegistra', mssql.Int, idUsuario)
+            .query('EXEC SP_CREATE_Gasto @ID_Presupuesto, @DescripcionGasto, @MontoGastado, @FechaGasto, @RutaEvidencia, @ID_UsuarioRegistra');
+
+        res.json({ msg: 'Gasto registrado correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error al registrar gasto');
+    }
+};
+
+// --- Obtener Resumen (Dashboard) ---
+const getPresupuestos = async (req, res) => {
+    const { anio } = req.query; // ?anio=2025
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('Anio', mssql.Int, anio || new Date().getFullYear())
+            .query('EXEC SP_GET_PresupuestosResumen @Anio');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error obteniendo presupuestos');
+    }
+};
+
+// --- Obtener Detalle de Gastos ---
+const getDetalleGastos = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('ID_Presupuesto', mssql.Int, id)
+            .query('EXEC SP_GET_DetalleGastos @ID_Presupuesto');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error obteniendo detalle');
+    }
+};
+
+// --- NUEVO: Editar Presupuesto ---
+const editarPresupuesto = async (req, res) => {
+    const { id } = req.params;
+    const { nombreRubro, descripcion, montoAsignado, anio, estado } = req.body;
+    
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID_Presupuesto', mssql.Int, id)
+            .input('NombreRubro', mssql.NVarChar, nombreRubro)
+            .input('Descripcion', mssql.NVarChar, descripcion)
+            .input('MontoAsignado', mssql.Decimal(18, 2), montoAsignado)
+            .input('Anio', mssql.Int, anio)
+            .input('Estado', mssql.NVarChar, estado)
+            .query('EXEC SP_UPDATE_Presupuesto @ID_Presupuesto, @NombreRubro, @Descripcion, @MontoAsignado, @Anio, @Estado');
+
+        res.json({ msg: 'Presupuesto actualizado correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error al actualizar presupuesto');
+    }
+};
+
+// --- NUEVO: Eliminar Presupuesto ---
+const eliminarPresupuesto = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('ID_Presupuesto', mssql.Int, id)
+            .query('EXEC SP_DELETE_Presupuesto @ID_Presupuesto');
+
+        res.json({ msg: 'Rubro eliminado exitosamente' });
+    } catch (err) {
+        // Capturamos el error del SP (si tiene gastos)
+        if (err.message.includes('ya tiene gastos registrados')) {
+            return res.status(400).json({ msg: err.message });
+        }
+        console.error(err);
+        res.status(500).send('Error al eliminar presupuesto');
+    }
+};
+
+export default { 
+    crearPresupuesto, 
+    registrarGasto, 
+    getPresupuestos, 
+    getDetalleGastos,
+    editarPresupuesto, // <--- Nuevo
+    eliminarPresupuesto // <--- Nuevo
+};
+
+
+==================================================================
 ARCHIVO: backend\controllers\collabDocsController.js
 ==================================================================
 // backend/controllers/collabDocsController.js
@@ -1459,6 +1594,44 @@ const documentController = {
 };
 
 export default documentController;
+
+
+==================================================================
+ARCHIVO: backend\controllers\historyController.js
+==================================================================
+// backend/controllers/historyController.js
+import { poolPromise, mssql } from '../config/dbConfig.js';
+
+const getHistorialColaborador = async (req, res) => {
+    // CAMBIO: Ahora recibimos la Cédula, no el ID
+    const { cedula } = req.params; 
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('Cedula', mssql.NVarChar, cedula) // <--- Cambio aquí
+            .query('EXEC SP_GET_Historial_Colaborador @Cedula');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error obteniendo historial colaborador');
+    }
+};
+
+const getHistorialActivo = async (req, res) => {
+    const { id } = req.params; // ID Activo
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('ID_Activo', mssql.Int, id)
+            .query('EXEC SP_GET_Historial_Activo @ID_Activo');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error obteniendo historial activo');
+    }
+};
+
+export default { getHistorialColaborador, getHistorialActivo };
 
 
 ==================================================================
@@ -2705,7 +2878,7 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import path from 'path'; 
 import { fileURLToPath } from 'url';
 import { logAction } from '../services/logService.js';
-import { crearNotificacion } from '../services/notificationService.js'; // Servicio de Notificaciones
+import { crearNotificacion } from '../services/notificationService.js'; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2732,20 +2905,19 @@ const crearReporteMaquina = async (req, res) => {
             .input('kilometraje', mssql.Int, kilometraje || null)
             .query('EXEC SP_CREATE_ReporteMaquina @idActivo, @idUsuarioReporta, @estadoReportado, @descripcionProblema, @rutaFotoAdjunta, @datosReporte, @kilometraje');
 
-        // 2. Obtener nombre del activo para la notificación (Consulta rápida)
+        // 2. Obtener nombre del activo para la notificación
         const activoResult = await pool.request().input('id', mssql.Int, idActivo).query('SELECT NombreDescriptivo FROM ActivosInspeccionables WHERE ID_Activo = @id');
         const nombreEquipo = activoResult.recordset[0]?.NombreDescriptivo || 'Equipo';
 
-        // --- NOTIFICACIÓN: REPORTE DE MÁQUINA ---
+        // --- NOTIFICACIÓN ---
         if (estadoReportado === 'Con Problema') {
             await crearNotificacion({
-                rolDestino: 'Administrador SST', // También podrías enviar a 'Mantenimiento' si existiera el rol
+                rolDestino: 'Administrador SST', 
                 titulo: `🔴 Falla Reportada: ${nombreEquipo}`,
                 mensaje: `El equipo ${nombreEquipo} reporta fallas. Revisar urgente. Reportado por: ${req.usuario.nombre}`,
                 ruta: '/reportes'
             });
         }
-        // ----------------------------------------
 
         res.status(201).json({ msg: 'Reporte enviado exitosamente' });
     } catch (err) {
@@ -2775,8 +2947,7 @@ const crearReporteSeguridad = async (req, res) => {
             .input('rutaFotoAdjunta', mssql.NVarChar, archivoFoto) 
             .query('EXEC SP_CREATE_ReporteSeguridad @idUsuarioReporta, @tipoReporte, @ubicacionArea, @descripcion, @rutaFotoAdjunta');
 
-        // --- NOTIFICACIÓN: REPORTE SEGURIDAD ---
-        // Se notifica a SST y Super Admin
+        // --- NOTIFICACIÓN ---
         const mensajeAlerta = `⚠️ Nuevo reporte de seguridad en ${ubicacionArea}. Tipo: ${tipoReporte}.`;
         
         await crearNotificacion({
@@ -2792,7 +2963,6 @@ const crearReporteSeguridad = async (req, res) => {
             mensaje: mensajeAlerta,
             ruta: '/reportes'
         });
-        // ---------------------------------------
 
         res.status(201).json({ msg: 'Reporte de seguridad enviado exitosamente' });
     } catch (err) {
@@ -2825,7 +2995,9 @@ const getReportesSeguridad = async (req, res) => {
 
 const getReporteMaquinaDetalle = async (req, res) => {
     const { id: idReporte } = req.params;
-    const esAdmin = ['Administrador SST', 'Super Admin', 'Gestion de Calidad'].includes(req.usuario.rol);
+    
+    // --- CAMBIO: Se eliminó 'Gestion de Calidad' ---
+    const esAdmin = ['Administrador SST', 'Super Admin'].includes(req.usuario.rol);
     const marcarRevisado = esAdmin ? 1 : 0;
 
     try {
@@ -2851,7 +3023,9 @@ const getReporteMaquinaDetalle = async (req, res) => {
 
 const getReporteSeguridadDetalle = async (req, res) => {
     const { id: idReporte } = req.params;
-    const esAdmin = ['Administrador SST', 'Super Admin', 'Gestion de Calidad'].includes(req.usuario.rol);
+    
+    // --- CAMBIO: Se eliminó 'Gestion de Calidad' ---
+    const esAdmin = ['Administrador SST', 'Super Admin'].includes(req.usuario.rol);
     const marcarRevisado = esAdmin ? 1 : 0;
 
     try {
@@ -3993,6 +4167,35 @@ export default router;
 
 
 ==================================================================
+ARCHIVO: backend\routes\budgetRoutes.js
+==================================================================
+// backend/routes/budgetRoutes.js
+import express from 'express';
+import budgetController from '../controllers/budgetController.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
+import upload from '../middleware/fileUpload.js'; // Reusamos tu middleware de subida
+
+const router = express.Router();
+
+// Obtener resumen (Todos los admins pueden ver)
+router.get('/', [protect, admin], budgetController.getPresupuestos);
+
+// Obtener detalle de gastos de un presupuesto
+router.get('/:id/gastos', [protect, admin], budgetController.getDetalleGastos);
+
+// Crear Presupuesto (Super Admin y Admin SST pueden, pero idealmente Super Admin asigna)
+router.post('/asignar', [protect, admin], budgetController.crearPresupuesto);
+
+// Registrar Gasto (Con evidencia)
+router.post('/gastar', [protect, admin], upload.single('evidencia'), budgetController.registrarGasto);
+
+router.put('/:id', [protect, admin], budgetController.editarPresupuesto);
+router.delete('/:id', [protect, admin], budgetController.eliminarPresupuesto);
+
+export default router;
+
+
+==================================================================
 ARCHIVO: backend\routes\collabDocsRoutes.js
 ==================================================================
 // backend/routes/collabDocsRoutes.js
@@ -4217,6 +4420,23 @@ router.get(
     [ protect, admin ],
     documentController.streamDocumento 
 );
+
+export default router;
+
+
+==================================================================
+ARCHIVO: backend\routes\historyRoutes.js
+==================================================================
+// backend/routes/historyRoutes.js
+import express from 'express';
+import historyController from '../controllers/historyController.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
+
+const router = express.Router();
+
+// CAMBIO: El parámetro ahora se llama :cedula
+router.get('/colaborador/:cedula', [protect, admin], historyController.getHistorialColaborador);
+router.get('/activo/:id', [protect, admin], historyController.getHistorialActivo);
 
 export default router;
 
@@ -4757,6 +4977,8 @@ import pesvRoutes from './routes/pesvRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import collabDocsRoutes from './routes/collabDocsRoutes.js';
 import committeeRoutes from './routes/committeeRoutes.js'
+import budgetRoutes from './routes/budgetRoutes.js';
+import historyRoutes from './routes/historyRoutes.js'; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -4793,6 +5015,8 @@ app.use('/api/pesv', pesvRoutes);
 app.use('/api/solicitudes', requestRoutes);
 app.use('/api/colaboradores-docs', collabDocsRoutes);
 app.use('/api/actas', committeeRoutes);
+app.use('/api/presupuesto', budgetRoutes);
+app.use('/api/historial', historyRoutes);
 
 initCronJobs();
 
@@ -5703,6 +5927,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
+// Páginas
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage'; 
 import UsuariosPage from './pages/UsuariosPage';
@@ -5720,31 +5945,27 @@ import SolicitudesPage from './pages/SolicitudesPage.jsx';
 import ReportarMaquinaPage from './pages/ReportarMaquinaPage.jsx'; 
 import ReportarSeguridadPage from './pages/ReportarSeguridadPage.jsx';
 import DashboardSuperAdmin from './pages/DashboardSuperAdmin';
-import DashboardCalidad from './pages/DashboardCalidad';
 import GestionFormulariosPage from './pages/GestionFormulariosPage'; 
 import DirectorioExternoPage from './pages/DirectorioExternoPage';
-// --- IMPORTACIÓN NUEVA ---
 import ActasPage from './pages/ActasPage.jsx'; 
+import PresupuestoPage from './pages/PresupuestoPage.jsx';
+import HistorialPage from './pages/HistorialPage.jsx';
 
+// Layouts
 import MainLayout from './layout/MainLayout'; 
 import ColaboradorLayout from './layout/ColaboradorLayout.jsx'; 
 import ProtectedRoutes from './components/ProtectedRoutes';
 
 const AdminRoutes = () => {
     const { usuario } = useAuth();
-    const tieneAcceso = usuario.rol === 'Super Admin' || usuario.rol === 'Administrador SST' || usuario.rol === 'Gestion de Calidad';
+    // CAMBIO: Se eliminó Gestión de Calidad
+    const tieneAcceso = usuario.rol === 'Super Admin' || usuario.rol === 'Administrador SST';
     return tieneAcceso ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
 
 const SuperAdminRoutes = () => {
     const { usuario } = useAuth();
     return usuario.rol === 'Super Admin' ? <Outlet /> : <Navigate to="/dashboard" replace />;
-};
-
-const CalidadRoutes = () => {
-    const { usuario } = useAuth();
-    const tienePermiso = usuario.rol === 'Gestion de Calidad' || usuario.rol === 'Super Admin';
-    return tienePermiso ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
 
 function App() {
@@ -5762,7 +5983,7 @@ function App() {
     const getDefaultRoute = () => {
         if (!usuario) return "/login";
         if (usuario.rol === 'Super Admin') return "/super-admin/dashboard";
-        if (usuario.rol === 'Gestion de Calidad') return "/calidad/dashboard";
+        // CAMBIO: Se eliminó la ruta de Calidad
         if (usuario.rol === 'Administrador SST') return "/dashboard";
         if (usuario.rol === 'Colaborador') return "/dashboard"; 
         return "/login";
@@ -5781,7 +6002,7 @@ function App() {
                     
                     <Route path="dashboard" element={
                         usuario?.rol === 'Super Admin' ? <Navigate to="/super-admin/dashboard" replace /> :
-                        usuario?.rol === 'Gestion de Calidad' ? <Navigate to="/calidad/dashboard" replace /> :
+                        // CAMBIO: Se eliminó la redirección a Calidad
                         <DashboardPage /> 
                     } />
                     
@@ -5791,12 +6012,7 @@ function App() {
                         <Route path="formularios" element={<GestionFormulariosPage />} />
                     </Route>
 
-                    {/* CALIDAD */}
-                    <Route path="calidad" element={<CalidadRoutes />}>
-                         <Route path="dashboard" element={<DashboardCalidad />} />
-                    </Route>
-
-                    {/* GESTIÓN */}
+                    {/* GESTIÓN Y ADMINISTRACIÓN (RUTAS COMPARTIDAS SUPER ADMIN Y ADMIN SST) */}
                     <Route element={<AdminRoutes />}>
                         <Route path="usuarios" element={<UsuariosPage />} />
                         <Route path="directorio" element={<DirectorioExternoPage />} />
@@ -5812,9 +6028,9 @@ function App() {
                         <Route path="pesv" element={<PesvPage />} /> 
                         <Route path="solicitudes" element={<SolicitudesPage />} />
                         <Route path="logs" element={<LogsPage />} />
-                        
-                        {/* --- RUTA NUEVA --- */}
                         <Route path="actas" element={<ActasPage />} />
+                        <Route path="presupuesto" element={<PresupuestoPage />} />
+                        <Route path="historial" element={<HistorialPage />} />
                     </Route>
 
                     {/* COLABORADOR */}
@@ -9306,12 +9522,17 @@ ARCHIVO: frontend\src\components\ModalGenerarPdfMedico.jsx
 import React, { useState } from 'react';
 import { generarPdfExamen } from '../services/medicalService';
 import '../style/Modal.css';
-import { BsFileEarmarkPdfFill, BsCardHeading } from 'react-icons/bs';
+import { BsFileEarmarkPdfFill, BsCardHeading, BsCalendarEvent, BsHash } from 'react-icons/bs';
 import Swal from 'sweetalert2';
 
 const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
     
-    // Valores por defecto
+    // --- CORRECCIÓN DE SEGURIDAD ---
+    // Si por alguna razón 'examen' llega vacío, no renderizamos nada para evitar el error.
+    if (!examen) return null;
+
+    // Valores por defecto del encabezado
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [headerData, setHeaderData] = useState({
         codigo: 'SST-FTO-001',
         version: '1',
@@ -9319,6 +9540,7 @@ const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
         fechaRevision: new Date().toISOString().split('T')[0]
     });
 
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isGenerating, setIsGenerating] = useState(false);
 
     const handleChange = (e) => {
@@ -9334,11 +9556,11 @@ const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
             Swal.fire({
                 icon: 'success',
                 title: 'PDF Descargado',
-                text: 'El archivo se ha generado con el encabezado configurado.',
+                text: 'El documento se ha generado correctamente.',
                 timer: 2000,
                 showConfirmButton: false
             });
-            alCerrar(); // Cerramos el modal al terminar
+            alCerrar();
         } catch (error) {
             Swal.fire('Error', error.message, 'error');
         } finally {
@@ -9358,35 +9580,40 @@ const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
                 <form onSubmit={handleGenerar}>
                     <div className="modal-body">
                         
-                        <div style={{backgroundColor: '#e7f3ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #b6d4fe'}}>
-                            <div style={{fontSize:'0.9rem', marginBottom:'10px', color:'#005A5B', display:'flex', alignItems:'center', gap:'8px'}}>
-                                <BsCardHeading size={20} />
-                                <strong>Configurar Encabezado del Documento</strong>
+                        <p style={{fontSize:'0.9rem', color:'#666', marginBottom: '1rem'}}>
+                            Vas a generar el documento para: <strong style={{color:'#005A5B'}}>{examen.NombreColaborador}</strong>
+                        </p>
+
+                        {/* --- SECCIÓN DE ENCABEZADO --- */}
+                        <div style={{backgroundColor: '#f0f7ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cce5ff'}}>
+                            <div style={{fontSize:'0.9rem', marginBottom:'15px', color:'#005A5B', display:'flex', alignItems:'center', gap:'8px', borderBottom:'1px solid #cce5ff', paddingBottom:'5px'}}>
+                                <BsCardHeading size={18} />
+                                <strong>Configuración del Encabezado</strong>
                             </div>
                             
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px'}}>
+                                {/* Código */}
                                 <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem'}}>Código</label>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Código Doc</label>
                                     <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleChange} required />
                                 </div>
+                                {/* Versión */}
                                 <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem'}}>Versión</label>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Versión</label>
                                     <input className="form-control" name="version" value={headerData.version} onChange={handleChange} required />
                                 </div>
+                                {/* Fecha Emisión */}
                                 <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem'}}>Fecha Emisión</label>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Emisión</label>
                                     <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleChange} required />
                                 </div>
+                                {/* Fecha Revisión */}
                                 <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem'}}>Fecha Revisión</label>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Revisión</label>
                                     <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleChange} required />
                                 </div>
                             </div>
                         </div>
-
-                        <p style={{fontSize:'0.9rem', color:'#666'}}>
-                            Se generará el acta para: <strong>{examen.NombreColaborador}</strong>
-                        </p>
 
                     </div>
 
@@ -12300,24 +12527,23 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Sidebar.css'; 
 import logo from "../assets/logo-empaquetados.png";
 
-// Importamos iconos profesionales
+// Importamos iconos
 import { 
     BsGrid1X2Fill, BsPeopleFill, BsCalendarWeek, BsClipboard2CheckFill, 
     BsExclamationTriangleFill, BsGraphUpArrow, BsHouseFill, BsCpuFill, 
     BsShieldFillExclamation, BsFillFolderFill, BsHeartPulseFill, BsArchiveFill, 
-    BsFileEarmarkTextFill, BsShieldLockFill, BsJournalCheck, BsListCheck, 
+    BsFileEarmarkTextFill, BsShieldLockFill, BsListCheck, 
     BsBarChartFill, BsConeStriped, BsEnvelopeExclamation, BsJournalRichtext,
-    BsFileText // <--- Icono para Actas
+    BsFileText, BsCurrencyDollar, BsClockHistory 
 } from 'react-icons/bs';
 
 const Sidebar = ({ isOpen, onClose }) => {
     const { usuario } = useAuth(); 
     const containerClass = `sidebar-container ${isOpen ? 'open' : ''}`;
 
-    // Definimos los roles claramente
+    // Roles
     const isSuperAdmin = usuario?.rol === 'Super Admin';
     const isAdminSST = usuario?.rol === 'Administrador SST';
-    const isCalidad = usuario?.rol === 'Gestion de Calidad';
     const isColaborador = usuario?.rol === 'Colaborador';
 
     return (
@@ -12331,7 +12557,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <nav className="sidebar-nav">
                 
                 {/* =================================================
-                   MENÚ EXCLUSIVO SUPER ADMIN (Estratégico + Aprobaciones)
+                   MENÚ EXCLUSIVO SUPER ADMIN
                    ================================================= */}
                 {isSuperAdmin && (
                     <>
@@ -12354,6 +12580,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <NavLink to="/super-admin/formularios" className="sidebar-link" onClick={onClose}>
                             <BsListCheck /> Gestor de Formularios
                         </NavLink>
+                        
+                        <NavLink to="/presupuesto" className="sidebar-link" onClick={onClose}>
+                            <BsCurrencyDollar /> Gestión Presupuesto
+                        </NavLink>
+
+                        <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
+                            <BsClockHistory /> Historial y Trazabilidad
+                        </NavLink>
 
                         <div className="sidebar-section-label">APROBACIONES</div>
 
@@ -12370,28 +12604,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                 )}
 
                 {/* =================================================
-                   MENÚ GESTIÓN DE CALIDAD
-                   ================================================= */}
-                {isCalidad && (
-                    <>
-                        <div className="sidebar-section-label">CALIDAD</div>
-                        <NavLink to="/calidad/dashboard" className="sidebar-link" onClick={onClose}>
-                            <BsJournalCheck /> Dashboard Calidad
-                        </NavLink>
-                        <NavLink to="/documentos" className="sidebar-link" onClick={onClose}>
-                            <BsFillFolderFill /> Gestión Documental
-                        </NavLink>
-                        <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
-                            <BsGraphUpArrow /> Acciones (ACPM)
-                        </NavLink>
-                        {/* También pueden ver actas */}
-                        <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
-                            <BsFileText /> Actas de Comité
-                        </NavLink>
-                    </>
-                )}
-
-                {/* =================================================
                    MENÚ OPERATIVO SST (Solo para Admin SST)
                    ================================================= */}
                 {isAdminSST && (
@@ -12400,6 +12612,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                         
                         <NavLink to="/dashboard" className="sidebar-link" onClick={onClose}>
                             <BsGrid1X2Fill /> Dashboard SST
+                        </NavLink>
+
+                        <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
+                            <BsClockHistory /> Historial y Trazabilidad
+                        </NavLink>
+
+                        <NavLink to="/presupuesto" className="sidebar-link" onClick={onClose}>
+                            <BsCurrencyDollar /> Presupuesto SST
                         </NavLink>
 
                         <NavLink to="/usuarios" className="sidebar-link" onClick={onClose}>
@@ -12442,11 +12662,9 @@ const Sidebar = ({ isOpen, onClose }) => {
                             <BsGraphUpArrow /> Acciones (ACPM)
                         </NavLink>
                         
-                        {/* --- ENLACE NUEVO --- */}
                         <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
                             <BsFileText /> Actas de Comité
                         </NavLink>
-                        {/* -------------------- */}
 
                         <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
                             <BsEnvelopeExclamation /> Solicitudes a Gerencia
@@ -12463,7 +12681,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 )}
 
                 {/* =================================================
-                   MENÚ COLABORADOR (Reportes)
+                   MENÚ COLABORADOR
                    ================================================= */}
                 {isColaborador && (
                     <>
@@ -14147,66 +14365,6 @@ export default ActivosPage;
 
 
 ==================================================================
-ARCHIVO: frontend\src\pages\DashboardCalidad.jsx
-==================================================================
-// frontend/src/pages/DashboardCalidad.jsx
-
-import React from 'react';
-import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
-import '../style/DashboardAdmin.css'; 
-import { BsFillFolderFill, BsGraphUpArrow, BsClipboardCheck } from 'react-icons/bs';
-
-const DashboardCalidad = () => {
-    const { usuario } = useAuth();
-
-    return (
-        <div className="page-container">
-            <div className="dashboard-admin-header" style={{ borderBottom: '4px solid #20c997' }}>
-                <h1>Gestión de Calidad</h1>
-                <p>Bienvenido/a, <strong>{usuario.nombre}</strong>. Panel de aseguramiento de calidad.</p>
-            </div>
-
-            <div className="page-content-card">
-                <h2 style={{ marginBottom: '1.5rem' }}>Módulos Asignados</h2>
-                
-                <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
-                    
-                    <Link to="/documentos" className="kpi-card-link">
-                        <div className="kpi-card">
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <BsFillFolderFill /> Gestión Documental
-                            </h3>
-                            <p>Control de documentos, versiones y registros del sistema.</p>
-                        </div>
-                    </Link>
-
-                    <Link to="/acpm" className="kpi-card-link">
-                        <div className="kpi-card">
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <BsGraphUpArrow /> Acciones (ACPM)
-                            </h3>
-                            <p>Gestión de acciones correctivas, preventivas y de mejora.</p>
-                        </div>
-                    </Link>
-
-                    <div className="kpi-card" style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <BsClipboardCheck /> Auditorías
-                        </h3>
-                        <p>Módulo en construcción.</p>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default DashboardCalidad;
-
-
-==================================================================
 ARCHIVO: frontend\src\pages\DashboardPage.jsx
 ==================================================================
 // frontend/src/pages/DashboardPage.jsx
@@ -15602,6 +15760,355 @@ export default GestionFormulariosPage;
 
 
 ==================================================================
+ARCHIVO: frontend\src\pages\HistorialPage.jsx
+==================================================================
+// frontend/src/pages/HistorialPage.jsx
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { getColaboradores, buscarUsuarioExterno } from '../services/userService'; 
+import { getActivosTodos } from '../services/assetService';
+import { getHistorialColaborador, getHistorialActivo } from '../services/historyService';
+import '../index.css';
+import { 
+    BsPersonBadge, BsTruck, BsSearch, BsClockHistory, 
+    BsFileEarmarkMedical, BsFileText, BsConeStriped, BsTools, BsClipboardCheck, 
+    BsPersonVcard, BsLaptop
+} from 'react-icons/bs';
+
+const HistorialPage = () => {
+    const [activeTab, setActiveTab] = useState('colaboradores'); // 'colaboradores' | 'activos'
+    const [lista, setLista] = useState([]);
+    const [busqueda, setBusqueda] = useState('');
+    const [seleccionado, setSeleccionado] = useState(null);
+    const [historial, setHistorial] = useState([]);
+    
+    // Estados de carga
+    const [isLoadingList, setIsLoadingList] = useState(false);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+    // Cargar listas iniciales al cambiar de pestaña
+    useEffect(() => {
+        setLista([]);
+        setSeleccionado(null);
+        setHistorial([]);
+        setBusqueda('');
+        
+        if (activeTab === 'activos') {
+            cargarActivos();
+        } else {
+            // Cargar colaboradores locales al inicio
+            cargarColaboradoresLocales();
+        }
+    }, [activeTab]);
+
+    // --- CARGA DE COLABORADORES (HÍBRIDA: LOCAL + EXTERNA) ---
+    const cargarColaboradoresLocales = async () => {
+        setIsLoadingList(true);
+        try {
+            const dataLocales = await getColaboradores();
+            // Formateamos para unificar estructura
+            const localesFormateados = dataLocales.map(u => ({
+                Nombre: u.NombreCompleto,
+                Cedula: u.CedulaUsuario,
+                Cargo: u.Cargo || 'Sin cargo',
+                Tipo: 'Local',
+                // Guardamos ID local por si se necesita, aunque usaremos cédula
+                ID_Usuario: u.ID_Usuario 
+            }));
+            setLista(localesFormateados);
+        } catch (error) { console.error(error); } 
+        finally { setIsLoadingList(false); }
+    };
+
+    const buscarColaboradoresGlobal = async (texto) => {
+        if (!texto.trim()) {
+            cargarColaboradoresLocales();
+            return;
+        }
+
+        setIsLoadingList(true);
+        try {
+            // 1. Buscar Externos (API Gosen)
+            const externos = await buscarUsuarioExterno(texto);
+            
+            // 2. Traer locales actuales (o filtrar si ya están cargados)
+            const dataLocales = await getColaboradores();
+            const localesFiltrados = dataLocales.filter(u => 
+                (u.NombreCompleto || '').toLowerCase().includes(texto.toLowerCase()) || 
+                (u.CedulaUsuario || '').includes(texto)
+            ).map(u => ({
+                Nombre: u.NombreCompleto,
+                Cedula: u.CedulaUsuario,
+                Cargo: u.Cargo || 'Usuario del Sistema',
+                Tipo: 'Local',
+                ID_Usuario: u.ID_Usuario
+            }));
+
+            // 3. Unificar Listas (Prioridad: Local sobre Externo si la cédula se repite)
+            const mapaUnificado = new Map();
+
+            // Primero agregamos externos
+            externos.forEach(ext => {
+                mapaUnificado.set(ext.Cedula, { ...ext, Tipo: 'Externo' });
+            });
+
+            // Luego sobreescribimos con locales (si existen, tienen prioridad)
+            localesFiltrados.forEach(loc => {
+                mapaUnificado.set(loc.Cedula, loc);
+            });
+
+            setLista(Array.from(mapaUnificado.values()));
+
+        } catch (error) { 
+            console.error(error); 
+        } finally { 
+            setIsLoadingList(false); 
+        }
+    };
+
+    // --- CARGA DE ACTIVOS (MÁQUINAS Y VEHÍCULOS) ---
+    const cargarActivos = async () => {
+        setIsLoadingList(true);
+        try {
+            const data = await getActivosTodos();
+            setLista(data);
+        } catch (error) { console.error(error); } 
+        finally { setIsLoadingList(false); }
+    };
+
+    // --- MANEJO DE BÚSQUEDA ---
+    const handleBusquedaChange = (e) => {
+        setBusqueda(e.target.value);
+    };
+
+    const handleBusquedaKeyDown = (e) => {
+        if (e.key === 'Enter' && activeTab === 'colaboradores') {
+            buscarColaboradoresGlobal(busqueda);
+        }
+    };
+
+    // --- SELECCIÓN Y CARGA DE HISTORIAL ---
+    const handleSeleccionar = async (item) => {
+        setSeleccionado(item);
+        setHistorial([]); 
+        setIsLoadingHistory(true);
+        try {
+            if (activeTab === 'colaboradores') {
+                // USAMOS LA CÉDULA para traer historial (Local o Externo)
+                const data = await getHistorialColaborador(item.Cedula);
+                setHistorial(data);
+            } else {
+                // USAMOS EL ID DEL ACTIVO
+                const data = await getHistorialActivo(item.ID_Activo);
+                setHistorial(data);
+            }
+        } catch (error) { 
+            console.error(error); 
+        } finally { 
+            setIsLoadingHistory(false); 
+        }
+    };
+
+    // --- FILTRADO VISUAL (CORREGIDO EL ERROR AQUÍ) ---
+    const listaVisual = useMemo(() => {
+        // Si estamos en colaboradores, la lista ya viene filtrada por la búsqueda API (si se usó enter)
+        // o muestra los locales. Hacemos un filtrado ligero por si acaso.
+        const texto = busqueda.toLowerCase();
+
+        return lista.filter(item => {
+            if (activeTab === 'colaboradores') {
+                // Validación de nulos con ( || '')
+                const nombre = item.Nombre || '';
+                const cedula = item.Cedula || '';
+                return nombre.toLowerCase().includes(texto) || cedula.includes(texto);
+            } else {
+                // CORRECCIÓN DEL ERROR: Validación de nulos para Activos
+                const nombre = item.NombreDescriptivo || '';
+                const codigo = item.CodigoIdentificador || '';
+                const tipo = item.TipoActivo || '';
+                
+                return nombre.toLowerCase().includes(texto) || 
+                       codigo.toLowerCase().includes(texto) ||
+                       tipo.toLowerCase().includes(texto);
+            }
+        });
+    }, [lista, busqueda, activeTab]);
+
+    // Icono según tipo de evento
+    const getIconoEvento = (tipo) => {
+        const t = (tipo || '').toLowerCase(); // Validación de null
+        if (t.includes('examen')) return <BsFileEarmarkMedical style={{color:'#e91e63'}}/>;
+        if (t.includes('documento')) return <BsFileText style={{color:'#007BFF'}}/>;
+        if (t.includes('inspección') || t.includes('inspeccion')) return <BsClipboardCheck style={{color:'#28a745'}}/>;
+        if (t.includes('mantenimiento')) return <BsTools style={{color:'#fd7e14'}}/>;
+        if (t.includes('reporte')) return <BsConeStriped style={{color:'#dc3545'}}/>;
+        if (t.includes('licencia')) return <BsPersonVcard style={{color:'#6f42c1'}}/>;
+        if (t.includes('registro')) return <BsClockHistory style={{color:'#6c757d'}}/>;
+        return <BsClockHistory style={{color:'#6c757d'}}/>;
+    };
+
+    return (
+        <div className="page-container" style={{height:'90vh', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+            
+            <div className="page-header" style={{flexShrink:0, marginBottom:'1rem'}}>
+                <h1>Historial y Trazabilidad</h1>
+            </div>
+
+            {/* TABS SUPERIORES */}
+            <div style={{display:'flex', gap:'10px', marginBottom:'1rem'}}>
+                <button className={`btn ${activeTab==='colaboradores'?'btn-primary':'btn-secondary'}`} onClick={()=>setActiveTab('colaboradores')}>
+                    <BsPersonBadge /> Colaboradores
+                </button>
+                <button className={`btn ${activeTab==='activos'?'btn-primary':'btn-secondary'}`} onClick={()=>setActiveTab('activos')}>
+                    <BsTruck /> Máquinas y Vehículos
+                </button>
+            </div>
+
+            {/* CONTENEDOR DIVIDIDO */}
+            <div style={{display:'flex', gap:'1.5rem', flex:1, overflow:'hidden'}}>
+                
+                {/* --- PANEL IZQUIERDO: LISTA --- */}
+                <div style={{width:'350px', display:'flex', flexDirection:'column', backgroundColor:'white', borderRadius:'10px', border:'1px solid #dee2e6', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+                    
+                    {/* Buscador */}
+                    <div style={{padding:'1rem', borderBottom:'1px solid #eee'}}>
+                        <div className="search-input-container" style={{width:'100%'}}>
+                            <BsSearch style={{position:'absolute', left:'15px', top:'50%', transform:'translateY(-50%)', color:'#999'}}/>
+                            <input 
+                                className="form-control" 
+                                placeholder={activeTab==='colaboradores' ? "Nombre/Cédula + Enter (Externos)" : "Buscar activo..."} 
+                                style={{paddingLeft:'35px', borderRadius:'20px'}}
+                                value={busqueda}
+                                onChange={handleBusquedaChange}
+                                onKeyDown={handleBusquedaKeyDown} 
+                            />
+                        </div>
+                        {activeTab === 'colaboradores' && <small style={{color:'#999', fontSize:'0.75rem', marginLeft:'10px'}}>Presiona Enter para buscar en base externa</small>}
+                    </div>
+
+                    {/* Lista Scrolleable */}
+                    <div style={{flex:1, overflowY:'auto', padding:'0.5rem'}}>
+                        {isLoadingList ? <p style={{textAlign:'center', padding:'1rem'}}>Cargando...</p> : (
+                            listaVisual.map((item, idx) => (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => handleSeleccionar(item)}
+                                    style={{
+                                        padding:'1rem', marginBottom:'5px', borderRadius:'8px', cursor:'pointer', border:'1px solid transparent',
+                                        backgroundColor: (seleccionado && (
+                                            (activeTab === 'colaboradores' && seleccionado.Cedula === item.Cedula) || 
+                                            (activeTab === 'activos' && seleccionado.ID_Activo === item.ID_Activo)
+                                        )) ? '#e7f1ff' : 'white',
+                                        borderColor: (seleccionado && (
+                                            (activeTab === 'colaboradores' && seleccionado.Cedula === item.Cedula) || 
+                                            (activeTab === 'activos' && seleccionado.ID_Activo === item.ID_Activo)
+                                        )) ? '#007BFF' : 'transparent'
+                                    }}
+                                    className="hover-bg-light"
+                                >
+                                    {activeTab === 'colaboradores' ? (
+                                        <>
+                                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                                <div style={{fontWeight:'bold', color:'#333'}}>{item.Nombre}</div>
+                                                {item.Tipo === 'Externo' && <span className="status-pill status-pendiente" style={{fontSize:'0.6rem', padding:'2px 5px'}}>Ext</span>}
+                                            </div>
+                                            <small style={{color:'#666'}}>CC: {item.Cedula} <br/> {item.Cargo}</small>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{fontWeight:'bold', color:'#333'}}>{item.NombreDescriptivo}</div>
+                                            <small style={{color:'#666'}}>ID: {item.CodigoIdentificador} | {item.TipoActivo}</small>
+                                        </>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                        {listaVisual.length === 0 && !isLoadingList && <p style={{textAlign:'center', color:'#999', padding:'1rem'}}>No hay resultados.</p>}
+                    </div>
+                </div>
+
+                {/* --- PANEL DERECHO: TIMELINE --- */}
+                <div style={{flex:1, backgroundColor:'white', borderRadius:'10px', border:'1px solid #dee2e6', padding:'2rem', overflowY:'auto', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+                    
+                    {!seleccionado ? (
+                        <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#999', flexDirection:'column'}}>
+                            <BsClockHistory style={{fontSize:'3rem', marginBottom:'1rem', opacity:0.3}}/>
+                            <h3>Selecciona un elemento</h3>
+                            <p>Haz clic en la lista izquierda para ver su hoja de vida.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div style={{borderBottom:'2px solid #f0f0f0', paddingBottom:'1rem', marginBottom:'2rem', display:'flex', alignItems:'center', gap:'15px'}}>
+                                <div style={{width:'60px', height:'60px', backgroundColor:'#e9ecef', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.8rem', color:'#005A5B'}}>
+                                    {activeTab === 'colaboradores' ? <BsPersonBadge/> : <BsLaptop/>}
+                                </div>
+                                <div>
+                                    <h2 style={{margin:0, color:'#005A5B'}}>
+                                        {activeTab === 'colaboradores' ? seleccionado.Nombre : seleccionado.NombreDescriptivo}
+                                    </h2>
+                                    <p style={{margin:0, color:'#666'}}>
+                                        {activeTab === 'colaboradores' 
+                                            ? `Historial Laboral - Cédula: ${seleccionado.Cedula}` 
+                                            : `Historial del Equipo - Código: ${seleccionado.CodigoIdentificador}`}
+                                    </p>
+                                    {activeTab === 'colaboradores' && (
+                                        <small style={{color:'#007BFF'}}>{seleccionado.Cargo}</small>
+                                    )}
+                                </div>
+                            </div>
+
+                            {isLoadingHistory ? <p style={{textAlign:'center'}}>Cargando historial...</p> : (
+                                <div className="timeline-container">
+                                    {historial.length === 0 ? (
+                                        <div style={{textAlign:'center', padding:'2rem', color:'#666', border:'2px dashed #eee', borderRadius:'10px'}}>
+                                            <p>No hay eventos registrados en el historial de este ítem.</p>
+                                            <small>Aquí aparecerán exámenes, documentos, reportes y mantenimientos.</small>
+                                        </div>
+                                    ) : (
+                                        historial.map((evento, idx) => (
+                                            <div key={idx} style={{display:'flex', marginBottom:'1.5rem', position:'relative'}}>
+                                                {/* Línea vertical (truco visual) */}
+                                                {idx !== historial.length - 1 && (
+                                                    <div style={{position:'absolute', left:'24px', top:'40px', bottom:'-30px', width:'2px', backgroundColor:'#e9ecef'}}></div>
+                                                )}
+                                                
+                                                {/* Icono */}
+                                                <div style={{
+                                                    width:'50px', height:'50px', borderRadius:'50%', backgroundColor:'#f8f9fa', 
+                                                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem',
+                                                    border:'2px solid #e9ecef', zIndex:2, marginRight:'1.5rem', flexShrink:0
+                                                }}>
+                                                    {getIconoEvento(evento.TipoEvento)}
+                                                </div>
+
+                                                {/* Contenido */}
+                                                <div style={{flex:1, backgroundColor:'#fff', border:'1px solid #f0f0f0', borderRadius:'8px', padding:'1rem', boxShadow:'0 2px 4px rgba(0,0,0,0.02)', transition:'transform 0.2s'}}>
+                                                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
+                                                        <strong style={{color:'#005A5B', fontSize:'1rem'}}>{evento.TipoEvento}</strong>
+                                                        <span style={{fontSize:'0.85rem', color:'#999', fontWeight:'600'}}>
+                                                            {new Date(evento.Fecha).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                        </span>
+                                                    </div>
+                                                    <p style={{margin:0, color:'#555', fontSize:'0.95rem'}}>{evento.Descripcion}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+export default HistorialPage;
+
+
+==================================================================
 ARCHIVO: frontend\src\pages\IndicadoresPage.jsx
 ==================================================================
 /* eslint-disable no-unused-vars */
@@ -16511,11 +17018,11 @@ import { useAuth } from '../context/AuthContext';
 import '../style/LoginPage.css';
 import logo from "../assets/logo-empaquetados.png";
 // Iconos
-import { BsShieldCheck, BsJournalCheck, BsPeople, BsArrowLeft, BsPersonFill, BsLockFill } from 'react-icons/bs';
+import { BsShieldCheck, BsPeople, BsArrowLeft, BsPersonFill, BsLockFill } from 'react-icons/bs';
 
 const LoginPage = () => {
     const [view, setView] = useState('SELECCION');
-    const [selectedRoleTitle, setSelectedRoleTitle] = useState(''); // Solo para visualización
+    const [selectedRoleTitle, setSelectedRoleTitle] = useState('');
     const [cedula, setCedula] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -16550,9 +17057,7 @@ const LoginPage = () => {
 
         setIsLoadingLogin(true);
         try {
-            // El backend valida la credencial y devuelve el rol real del usuario
             await login(cedula, password);
-            // La redirección la maneja el AuthContext o el App.jsx basado en el rol devuelto
         } catch (err) {
             setError(err.message || 'Credenciales incorrectas.');
             setIsLoadingLogin(false);
@@ -16571,21 +17076,15 @@ const LoginPage = () => {
                 </div>
 
                 <div className="role-cards-container">
-                    {/* TARJETA 1: SG-SST (También entrada para Super Admin) */}
+                   
+                    {/* TARJETA 1: SG-SST */}
                     <div className="role-card" onClick={() => handleSelectRole('Seguridad y Salud en el Trabajo')}>
                         <div className="role-icon sst-color"><BsShieldCheck /></div>
                         <h3>Gestión SG-SST</h3>
                         <p>Administradores y Líderes SST</p>
                     </div>
 
-                    {/* TARJETA 2: CALIDAD (NUEVO) */}
-                    <div className="role-card" onClick={() => handleSelectRole('Gestión de Calidad')}>
-                        <div className="role-icon calidad-color"><BsJournalCheck /></div>
-                        <h3>Gestión de Calidad</h3>
-                        <p>Auditores y Control de Calidad</p>
-                    </div>
-
-                    {/* TARJETA 3: COLABORADOR */}
+                    {/* TARJETA 2: COLABORADOR */}
                     <div className="role-card" onClick={() => handleSelectRole('Colaborador')}>
                         <div className="role-icon collab-color"><BsPeople /></div>
                         <h3>Colaborador</h3>
@@ -16860,114 +17359,205 @@ export default LogsPage;
 ==================================================================
 ARCHIVO: frontend\src\pages\MedicinaLaboralPage.jsx
 ==================================================================
-// frontend/src/components/ModalGenerarPdfMedico.jsx
+// frontend/src/pages/MedicinaLaboralPage.jsx
 
-import React, { useState } from 'react';
-import { generarPdfExamen } from '../services/medicalService';
-import '../style/Modal.css';
-import { BsFileEarmarkPdfFill, BsCardHeading, BsCalendarEvent, BsHash } from 'react-icons/bs';
-import Swal from 'sweetalert2';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getHistorialExamenes } from '../services/medicalService';
+import '../index.css';
+import { BsPlusLg, BsSearch, BsFileEarmarkPdf, BsEyeFill, BsHeartPulseFill } from 'react-icons/bs';
 
-const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
+// Importamos los modales
+import ModalRegistrarExamen from '../components/ModalRegistrarExamen';
+import ModalVerExamen from '../components/ModalVerExamen';
+import ModalGenerarPdfMedico from '../components/ModalGenerarPdfMedico';
+
+const MedicinaLaboralPage = () => {
+    // --- ESTADOS ---
+    const [examenes, setExamenes] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    // eslint-disable-next-line no-unused-vars
+    const [error, setError] = useState('');
+    const [busqueda, setBusqueda] = useState('');
+
+    // Estados de Modales
+    const [modalRegistrarOpen, setModalRegistrarOpen] = useState(false);
+    const [modalVerOpen, setModalVerOpen] = useState(false);
+    const [modalPdfOpen, setModalPdfOpen] = useState(false);
     
-    // Valores por defecto del encabezado
-    const [headerData, setHeaderData] = useState({
-        codigo: 'SST-FTO-001',
-        version: '1',
-        fechaEmision: new Date().toISOString().split('T')[0],
-        fechaRevision: new Date().toISOString().split('T')[0]
-    });
+    // Examen seleccionado para Ver o Generar PDF
+    const [examenSeleccionado, setExamenSeleccionado] = useState(null);
 
-    const [isGenerating, setIsGenerating] = useState(false);
-
-    const handleChange = (e) => {
-        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
-    };
-
-    const handleGenerar = async (e) => {
-        e.preventDefault();
-        setIsGenerating(true);
+    // --- CARGA DE DATOS ---
+    const cargarExamenes = async () => {
+        setIsLoading(true);
         try {
-            // Llamamos al servicio enviando el ID, Cédula y los datos del Encabezado
-            await generarPdfExamen(examen.ID_ExamenMedico, examen.CedulaColaborador, headerData);
-            
-            Swal.fire({
-                icon: 'success',
-                title: 'PDF Descargado',
-                text: 'El documento se ha generado correctamente.',
-                timer: 2000,
-                showConfirmButton: false
-            });
-            alCerrar();
-        } catch (error) {
-            Swal.fire('Error', error.message, 'error');
+            const data = await getHistorialExamenes();
+            setExamenes(data);
+            setError('');
+        } catch (err) {
+            console.error(err);
+            setError('No se pudo cargar el historial médico.');
         } finally {
-            setIsGenerating(false);
+            setIsLoading(false);
         }
     };
 
+    useEffect(() => {
+        cargarExamenes();
+    }, []);
+
+    // --- FILTRADO ---
+    const examenesFiltrados = useMemo(() => {
+        const texto = busqueda.toLowerCase();
+        return examenes.filter(ex => 
+            ex.NombreColaborador.toLowerCase().includes(texto) ||
+            ex.CedulaColaborador.includes(texto) ||
+            ex.TipoExamen.toLowerCase().includes(texto)
+        );
+    }, [examenes, busqueda]);
+
+    // --- MANEJADORES ---
+    const handleExamenRegistrado = () => {
+        setModalRegistrarOpen(false);
+        cargarExamenes();
+    };
+
+    const abrirModalVer = (examen) => {
+        setExamenSeleccionado(examen);
+        setModalVerOpen(true);
+    };
+
+    const abrirModalPdf = (examen) => {
+        setExamenSeleccionado(examen);
+        setModalPdfOpen(true);
+    };
+
+    // Formatear fecha para visualización
+    const formatearFecha = (fechaISO) => {
+        if (!fechaISO) return '--';
+        return new Date(fechaISO).toLocaleDateString('es-CO');
+    };
+
+    // Color según concepto
+    const getConceptoClass = (concepto) => {
+        if (concepto === 'Apto') return 'status-activo';
+        if (concepto === 'Apto con restricciones') return 'status-proceso'; // Azul o Amarillo
+        return 'status-inactivo'; // Rojo (No Apto)
+    };
+
     return (
-        <div className="modal-overlay" onClick={alCerrar}>
-            <div className="modal-content" style={{maxWidth:'500px'}} onClick={e => e.stopPropagation()}>
-                
-                <div className="modal-header">
-                    <h3>Generar PDF de Recomendaciones</h3>
-                    <button onClick={alCerrar} className="modal-close-button">&times;</button>
-                </div>
-
-                <form onSubmit={handleGenerar}>
-                    <div className="modal-body">
-                        
-                        <p style={{fontSize:'0.9rem', color:'#666', marginBottom: '1rem'}}>
-                            Vas a generar el documento para: <strong style={{color:'#005A5B'}}>{examen.NombreColaborador}</strong>
-                        </p>
-
-                        {/* --- SECCIÓN DE ENCABEZADO (La que no te aparecía) --- */}
-                        <div style={{backgroundColor: '#f0f7ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cce5ff'}}>
-                            <div style={{fontSize:'0.9rem', marginBottom:'15px', color:'#005A5B', display:'flex', alignItems:'center', gap:'8px', borderBottom:'1px solid #cce5ff', paddingBottom:'5px'}}>
-                                <BsCardHeading size={18} />
-                                <strong>Configuración del Encabezado</strong>
-                            </div>
-                            
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px'}}>
-                                {/* Código */}
-                                <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Código Doc</label>
-                                    <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleChange} required />
-                                </div>
-                                {/* Versión */}
-                                <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Versión</label>
-                                    <input className="form-control" name="version" value={headerData.version} onChange={handleChange} required />
-                                </div>
-                                {/* Fecha Emisión */}
-                                <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Emisión</label>
-                                    <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleChange} required />
-                                </div>
-                                {/* Fecha Revisión */}
-                                <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Revisión</label>
-                                    <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleChange} required />
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={alCerrar} disabled={isGenerating}>Cancelar</button>
-                        <button type="submit" className="btn btn-primary" disabled={isGenerating}>
-                            <BsFileEarmarkPdfFill /> {isGenerating ? 'Generando...' : 'Descargar PDF'}
-                        </button>
-                    </div>
-                </form>
+        <div className="page-container">
+            <div className="page-header">
+                <h1>Medicina Laboral</h1>
+                <button className="btn btn-primary" onClick={() => setModalRegistrarOpen(true)}>
+                    <BsPlusLg /> Registrar Examen
+                </button>
             </div>
+
+            {/* BARRA DE BÚSQUEDA */}
+            <div className="filters-bar" style={{marginBottom:'1.5rem'}}>
+                <div className="search-input-container" style={{maxWidth:'400px', position:'relative'}}>
+                    <BsSearch style={{position:'absolute', left:'15px', top:'50%', transform:'translateY(-50%)', color:'#999'}}/>
+                    <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Buscar por nombre, cédula o tipo..." 
+                        style={{paddingLeft:'40px', borderRadius:'20px'}}
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <div className="page-content-card">
+                <div className="table-wrapper">
+                    {isLoading ? <p>Cargando exámenes...</p> : (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Colaborador</th>
+                                    <th>Cédula</th>
+                                    <th>Tipo Examen</th>
+                                    <th>Concepto</th>
+                                    <th style={{textAlign:'center'}}>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {examenesFiltrados.length === 0 ? (
+                                    <tr><td colSpan="6" style={{textAlign:'center', padding:'2rem', color:'#999'}}>No se encontraron registros.</td></tr>
+                                ) : (
+                                    examenesFiltrados.map((ex) => (
+                                        <tr key={ex.ID_ExamenMedico}>
+                                            <td>{formatearFecha(ex.FechaExamen)}</td>
+                                            <td><strong>{ex.NombreColaborador}</strong></td>
+                                            <td>{ex.CedulaColaborador}</td>
+                                            <td><span style={{display:'flex', alignItems:'center', gap:'5px'}}><BsHeartPulseFill style={{color:'#e91e63'}}/> {ex.TipoExamen}</span></td>
+                                            <td>
+                                                <span className={`status-pill ${getConceptoClass(ex.ConceptoAptitud)}`}>
+                                                    {ex.ConceptoAptitud}
+                                                </span>
+                                            </td>
+                                            <td style={{textAlign:'center'}}>
+                                                <div style={{display:'flex', gap:'5px', justifyContent:'center'}}>
+                                                    {/* Botón VER DETALLE */}
+                                                    <button 
+                                                        className="btn btn-sm btn-secondary" 
+                                                        onClick={() => abrirModalVer(ex)}
+                                                        title="Ver Detalle Completo"
+                                                    >
+                                                        <BsEyeFill />
+                                                    </button>
+
+                                                    {/* Botón GENERAR PDF */}
+                                                    <button 
+                                                        className="btn btn-sm btn-warning" 
+                                                        onClick={() => abrirModalPdf(ex)}
+                                                        title="Generar Acta/PDF"
+                                                        style={{color:'#333'}}
+                                                    >
+                                                        <BsFileEarmarkPdf />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+
+            {/* --- MODALES --- */}
+            
+            {modalRegistrarOpen && (
+                <ModalRegistrarExamen 
+                    alCerrar={() => setModalRegistrarOpen(false)} 
+                    alExito={handleExamenRegistrado} 
+                />
+            )}
+
+            {modalVerOpen && examenSeleccionado && (
+                <ModalVerExamen 
+                    examenId={examenSeleccionado.ID_ExamenMedico} 
+                    alCerrar={() => setModalVerOpen(false)} 
+                />
+            )}
+
+            {/* CORRECCIÓN: Renderizado Condicional Seguro */}
+            {modalPdfOpen && examenSeleccionado && (
+                <ModalGenerarPdfMedico 
+                    examen={examenSeleccionado} 
+                    alCerrar={() => setModalPdfOpen(false)} 
+                />
+            )}
+
         </div>
     );
 };
 
-export default ModalGenerarPdfMedico;
+export default MedicinaLaboralPage;
 
 
 ==================================================================
@@ -17531,6 +18121,17 @@ const PlanificacionPage = () => {
         });
     }, [actividades, busqueda, filtroEstado]);
 
+    // --- NUEVO: Cálculo de Totales para la Leyenda ---
+    const totales = useMemo(() => {
+        return {
+            pendientes: actividades.filter(a => a.EstadoActividad === 'Pendiente').length,
+            realizadas: actividades.filter(a => a.EstadoActividad === 'Realizada').length,
+            canceladas: actividades.filter(a => a.EstadoActividad === 'Cancelada').length,
+            acpmAbiertas: acpms.filter(a => a.EstadoACPM !== 'Cerrada').length,
+            acpmCerradas: acpms.filter(a => a.EstadoACPM === 'Cerrada').length
+        };
+    }, [actividades, acpms]);
+
     // --- Calendario ---
     const calendarEvents = useMemo(() => {
         // 1. Actividades
@@ -17543,10 +18144,9 @@ const PlanificacionPage = () => {
             resource: act 
         }));
 
-        // 2. ACPMs (CORREGIDO: Muestra TODAS y usa FechaCierre si aplica)
+        // 2. ACPMs
         const eventosACPM = acpms.map(acpm => {
             const isCerrada = acpm.EstadoACPM === 'Cerrada';
-            // Si está cerrada, usamos FechaCierre. Si no, FechaLimite.
             const fechaEvento = isCerrada && acpm.FechaCierre ? acpm.FechaCierre : acpm.FechaLimite;
             
             return {
@@ -17583,7 +18183,6 @@ const PlanificacionPage = () => {
         let backgroundColor = '#3174ad'; 
         
         if (event.tipo === 'ACPM') {
-            // Gris para cerrada, Naranja para abierta/proceso
             backgroundColor = event.resource.EstadoACPM === 'Cerrada' ? '#6c757d' : '#fd7e14';
         } else {
             if (event.resource.EstadoActividad === 'Realizada') backgroundColor = '#28a745'; 
@@ -17682,14 +18281,31 @@ const PlanificacionPage = () => {
 
             {/* --- CALENDARIO INTEGRADO (PRIMERO) --- */}
             <div className="page-content-card calendar-card" style={{marginBottom: '2rem'}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-                    <h2>Calendario General</h2>
-                    <div style={{display: 'flex', gap: '1rem', fontSize: '0.9rem'}}>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#3174ad', borderRadius: '50%'}}></span> Pendiente</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#28a745', borderRadius: '50%'}}></span> Realizada</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#dc3545', borderRadius: '50%'}}></span> Cancelada</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#fd7e14', borderRadius: '50%'}}></span> ACPM (Abierta)</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#6c757d', borderRadius: '50%'}}></span> ACPM (Cerrada)</span>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap:'wrap', gap:'10px'}}>
+                    <h2 style={{margin:0}}>Calendario General</h2>
+                    
+                    {/* --- LEYENDA CON CONTADORES --- */}
+                    <div style={{display: 'flex', gap: '1rem', fontSize: '0.9rem', flexWrap:'wrap'}}>
+                        <span title="Actividades Pendientes" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#3174ad', borderRadius: '50%'}}></span> 
+                            Pendientes <strong>({totales.pendientes})</strong>
+                        </span>
+                        <span title="Actividades Realizadas" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#28a745', borderRadius: '50%'}}></span> 
+                            Realizadas <strong>({totales.realizadas})</strong>
+                        </span>
+                        <span title="Actividades Canceladas" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#dc3545', borderRadius: '50%'}}></span> 
+                            Canceladas <strong>({totales.canceladas})</strong>
+                        </span>
+                        <span title="ACPM en curso" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#fd7e14', borderRadius: '50%'}}></span> 
+                            ACPM (Abierta) <strong>({totales.acpmAbiertas})</strong>
+                        </span>
+                        <span title="ACPM Cerradas" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#6c757d', borderRadius: '50%'}}></span> 
+                            ACPM (Cerrada) <strong>({totales.acpmCerradas})</strong>
+                        </span>
                     </div>
                 </div>
                 
@@ -17714,7 +18330,7 @@ const PlanificacionPage = () => {
                 )}
             </div>
 
-            {/* --- BARRA DE FILTROS (EN EL MEDIO) --- */}
+            {/* --- BARRA DE FILTROS --- */}
             <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <div className="search-input-container" style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
                     <BsSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
@@ -17730,7 +18346,7 @@ const PlanificacionPage = () => {
                 </div>
             </div>
 
-            {/* --- TABLA DE ACTIVIDADES (SEGUNDO - ABAJO) --- */}
+            {/* --- TABLA DE ACTIVIDADES --- */}
             <div className="page-content-card">
                 <h2>Listado de Actividades</h2>
                 <div className="table-wrapper">
@@ -17776,7 +18392,6 @@ const PlanificacionPage = () => {
                                         </td>
 
                                         <td className="action-buttons">
-                                            {/* BOTÓN VER DETALLE */}
                                             <button 
                                                 className="btn btn-secondary" 
                                                 onClick={() => abrirModalDetalle(act)} 
@@ -17785,7 +18400,6 @@ const PlanificacionPage = () => {
                                                 <BsInfoCircle /> Ver Detalle
                                             </button>
 
-                                            {/* BOTONES DE GESTIÓN (Solo si NO es Realizada ni Cancelada) */}
                                             {act.EstadoActividad !== 'Realizada' && act.EstadoActividad !== 'Cancelada' && (
                                                 <>
                                                     <button className="btn btn-secondary" onClick={() => abrirModalGestionar(act)} title="Cambiar Estado">Gestionar</button>
@@ -17816,6 +18430,336 @@ const PlanificacionPage = () => {
 };
 
 export default PlanificacionPage;
+
+
+==================================================================
+ARCHIVO: frontend\src\pages\PresupuestoPage.jsx
+==================================================================
+// frontend/src/pages/PresupuestoPage.jsx
+
+import React, { useState, useEffect } from 'react';
+import { 
+    getPresupuestos, 
+    crearPresupuesto, 
+    registrarGasto, 
+    getDetalleGastos,
+    editarPresupuesto,
+    eliminarPresupuesto 
+} from '../services/budgetService';
+import { useAuth } from '../context/AuthContext';
+import '../index.css';
+import Swal from 'sweetalert2';
+import { 
+    BsCashCoin, BsPlusLg, BsFileEarmarkArrowUp, BsEye, 
+    BsCurrencyDollar, BsPencilSquare, BsTrash, BsArchiveFill // <--- Agregué icono de archivo
+} from 'react-icons/bs';
+
+const API_URL = 'http://localhost:5000';
+
+const PresupuestoPage = () => {
+    const { usuario } = useAuth();
+    const [presupuestos, setPresupuestos] = useState([]);
+    const [anio, setAnio] = useState(new Date().getFullYear());
+    
+    // Modales
+    const [modalAsignarOpen, setModalAsignarOpen] = useState(false);
+    const [modalGastoOpen, setModalGastoOpen] = useState(false);
+    const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
+    
+    // Estados auxiliares
+    const [selectedPresupuesto, setSelectedPresupuesto] = useState(null);
+    const [listaGastos, setListaGastos] = useState([]);
+    const [isEditing, setIsEditing] = useState(false);
+
+    // Forms
+    const [formAsignar, setFormAsignar] = useState({ 
+        idPresupuesto: null,
+        nombreRubro: '', 
+        descripcion: '', 
+        montoAsignado: '', 
+        anio: new Date().getFullYear(),
+        estado: 'Activo'
+    });
+    
+    const [formGasto, setFormGasto] = useState({ 
+        descripcionGasto: '', 
+        montoGastado: '', 
+        fechaGasto: new Date().toISOString().split('T')[0] 
+    });
+    const [archivoGasto, setArchivoGasto] = useState(null);
+
+    const esSuperAdmin = usuario.rol === 'Super Admin';
+
+    useEffect(() => {
+        cargarDatos();
+    }, [anio]);
+
+    const cargarDatos = async () => {
+        try {
+            const data = await getPresupuestos(anio);
+            setPresupuestos(data);
+        } catch (error) { console.error(error); }
+    };
+
+    // --- LOGICA MODAL ASIGNAR/EDITAR ---
+    const abrirModalCrear = () => {
+        setIsEditing(false);
+        setFormAsignar({ 
+            idPresupuesto: null,
+            nombreRubro: '', descripcion: '', montoAsignado: '', 
+            anio: anio, estado: 'Activo' 
+        });
+        setModalAsignarOpen(true);
+    };
+
+    const abrirModalEditar = (p) => {
+        setIsEditing(true);
+        setFormAsignar({
+            idPresupuesto: p.ID_Presupuesto,
+            nombreRubro: p.NombreRubro,
+            descripcion: p.Descripcion || '',
+            montoAsignado: p.MontoAsignado,
+            anio: p.Anio,
+            estado: p.Estado
+        });
+        setModalAsignarOpen(true);
+    };
+
+    const handleGuardarPresupuesto = async (e) => {
+        e.preventDefault();
+        try {
+            if (isEditing) {
+                await editarPresupuesto(formAsignar.idPresupuesto, formAsignar);
+                Swal.fire('Actualizado', 'Rubro actualizado correctamente.', 'success');
+            } else {
+                await crearPresupuesto(formAsignar);
+                Swal.fire('Creado', 'Presupuesto asignado.', 'success');
+            }
+            setModalAsignarOpen(false);
+            cargarDatos();
+        } catch (error) { 
+            Swal.fire('Error', error.message, 'error'); 
+        }
+    };
+
+    // --- LOGICA INACTIVAR (Antes Eliminar) ---
+    const handleEliminar = async (id, nombre) => {
+        const result = await Swal.fire({
+            title: '¿Inactivar Rubro?',
+            text: `Se ocultará el rubro "${nombre}" de la lista principal.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Sí, inactivar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                await eliminarPresupuesto(id); // Llama al backend que ahora hace UPDATE
+                Swal.fire('Inactivado', 'El rubro ha sido archivado.', 'success');
+                cargarDatos();
+            } catch (error) {
+                // Mensaje si tiene gastos (viene del SP)
+                Swal.fire('No se puede inactivar', error.message, 'error');
+            }
+        }
+    };
+
+    // --- LOGICA GASTAR (Admin SST) ---
+    const abrirModalGasto = (p) => {
+        setSelectedPresupuesto(p);
+        setModalGastoOpen(true);
+    };
+
+    const handleGasto = async (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('idPresupuesto', selectedPresupuesto.ID_Presupuesto);
+        formData.append('descripcionGasto', formGasto.descripcionGasto);
+        formData.append('montoGastado', formGasto.montoGastado);
+        formData.append('fechaGasto', formGasto.fechaGasto);
+        if (archivoGasto) formData.append('evidencia', archivoGasto);
+
+        try {
+            await registrarGasto(formData);
+            Swal.fire('Registrado', 'Gasto guardado correctamente.', 'success');
+            setModalGastoOpen(false);
+            setFormGasto({ descripcionGasto: '', montoGastado: '', fechaGasto: new Date().toISOString().split('T')[0] });
+            setArchivoGasto(null);
+            cargarDatos();
+        } catch (error) { Swal.fire('Error', error.message, 'error'); }
+    };
+
+    // --- LOGICA VER DETALLE ---
+    const abrirModalDetalle = async (p) => {
+        setSelectedPresupuesto(p);
+        const gastos = await getDetalleGastos(p.ID_Presupuesto);
+        setListaGastos(gastos);
+        setModalDetalleOpen(true);
+    };
+
+    // --- UTILS ---
+    const formatMoney = (amount) => {
+        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount);
+    };
+
+    const getProgressColor = (porcentaje) => {
+        if (porcentaje > 90) return '#dc3545'; // Rojo
+        if (porcentaje > 70) return '#ffc107'; // Amarillo
+        return '#28a745'; // Verde
+    };
+
+    return (
+        <div className="page-container">
+            <div className="page-header">
+                <h1>Gestión de Presupuesto {anio}</h1>
+                <div style={{display:'flex', gap:'10px'}}>
+                    <input type="number" className="form-control" style={{width:'80px'}} value={anio} onChange={e => setAnio(e.target.value)} />
+                    {esSuperAdmin && (
+                        <button className="btn btn-primary" onClick={abrirModalCrear}>
+                            <BsPlusLg /> Asignar Nuevo Rubro
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="page-content-card">
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(350px, 1fr))', gap:'1.5rem'}}>
+                    {presupuestos.map(p => {
+                        const porcentaje = (p.TotalGastado / p.MontoAsignado) * 100;
+                        const colorBarra = getProgressColor(porcentaje);
+
+                        return (
+                            <div key={p.ID_Presupuesto} style={{border:'1px solid #eee', borderRadius:'10px', padding:'1.5rem', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', position:'relative', backgroundColor: '#fff'}}>
+                                
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                                    <h3 style={{margin:'0 0 5px 0', color:'#005A5B', maxWidth: '70%'}}>{p.NombreRubro}</h3>
+                                    
+                                    {/* BOTONES DE EDICIÓN (SOLO SUPER ADMIN) */}
+                                    {esSuperAdmin && (
+                                        <div style={{display:'flex', gap:'5px'}}>
+                                            <button className="btn btn-sm btn-icon" onClick={() => abrirModalEditar(p)} title="Editar Rubro">
+                                                <BsPencilSquare style={{color:'#f0ad4e'}}/>
+                                            </button>
+                                            <button className="btn btn-sm btn-icon" onClick={() => handleEliminar(p.ID_Presupuesto, p.NombreRubro)} title="Inactivar (Solo si sin gastos)">
+                                                <BsArchiveFill style={{color:'#dc3545'}}/> {/* Icono cambiado a Archive */}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <p style={{color:'#666', fontSize:'0.9rem', minHeight:'40px'}}>{p.Descripcion}</p>
+                                
+                                <div style={{marginBottom:'1rem'}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'5px'}}>
+                                        <span>Gastado: <strong>{formatMoney(p.TotalGastado)}</strong></span>
+                                        <span>Total: <strong>{formatMoney(p.MontoAsignado)}</strong></span>
+                                    </div>
+                                    <div style={{width:'100%', height:'10px', backgroundColor:'#e9ecef', borderRadius:'5px', overflow:'hidden'}}>
+                                        <div style={{width:`${Math.min(porcentaje, 100)}%`, height:'100%', backgroundColor: colorBarra, transition:'width 0.5s'}}></div>
+                                    </div>
+                                    <div style={{textAlign:'right', marginTop:'5px', fontWeight:'bold', color: p.SaldoDisponible < 0 ? 'red' : '#28a745'}}>
+                                        Disponible: {formatMoney(p.SaldoDisponible)}
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', gap:'10px', marginTop:'1rem'}}>
+                                    <button className="btn btn-secondary btn-sm" style={{flex:1}} onClick={() => abrirModalDetalle(p)}>
+                                        <BsEye /> Ver Gastos
+                                    </button>
+                                    <button className="btn btn-warning btn-sm" style={{flex:1}} onClick={() => abrirModalGasto(p)}>
+                                        <BsCashCoin /> Registrar Gasto
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {presupuestos.length === 0 && <p style={{color:'#666'}}>No hay rubros activos asignados para este año.</p>}
+                </div>
+            </div>
+
+            {/* MODAL ASIGNAR / EDITAR (SUPER ADMIN) */}
+            {modalAsignarOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{isEditing ? 'Editar Presupuesto' : 'Asignar Presupuesto'}</h3>
+                            <button className="modal-close-button" onClick={()=>setModalAsignarOpen(false)}>&times;</button>
+                        </div>
+                        <form onSubmit={handleGuardarPresupuesto}>
+                            <div className="modal-body">
+                                <div className="form-group"><label>Nombre Actividad/Rubro</label><input required className="form-control" value={formAsignar.nombreRubro} onChange={e=>setFormAsignar({...formAsignar, nombreRubro:e.target.value})} placeholder="Ej: Compra EPP"/></div>
+                                <div className="form-group"><label>Descripción</label><input className="form-control" value={formAsignar.descripcion} onChange={e=>setFormAsignar({...formAsignar, descripcion:e.target.value})}/></div>
+                                <div className="form-group"><label>Monto a Asignar ($)</label><input type="number" required className="form-control" value={formAsignar.montoAsignado} onChange={e=>setFormAsignar({...formAsignar, montoAsignado:e.target.value})}/></div>
+                                
+                                {isEditing && (
+                                    <div className="form-group">
+                                        <label>Estado</label>
+                                        <select className="form-control" value={formAsignar.estado} onChange={e=>setFormAsignar({...formAsignar, estado:e.target.value})}>
+                                            <option value="Activo">Activo</option>
+                                            <option value="Inactivo">Inactivo (Ocultar)</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer"><button className="btn btn-primary">{isEditing ? 'Actualizar' : 'Guardar'}</button></div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL REGISTRAR GASTO */}
+            {modalGastoOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header"><h3>Registrar Gasto: {selectedPresupuesto?.NombreRubro}</h3><button className="modal-close-button" onClick={()=>setModalGastoOpen(false)}>&times;</button></div>
+                        <form onSubmit={handleGasto}>
+                            <div className="modal-body">
+                                <div className="form-group"><label>Descripción del Gasto</label><input required className="form-control" value={formGasto.descripcionGasto} onChange={e=>setFormGasto({...formGasto, descripcionGasto:e.target.value})} placeholder="Ej: Factura #123 Panamericana"/></div>
+                                <div className="form-group"><label>Monto ($)</label><input type="number" required className="form-control" value={formGasto.montoGastado} onChange={e=>setFormGasto({...formGasto, montoGastado:e.target.value})}/></div>
+                                <div className="form-group"><label>Fecha</label><input type="date" required className="form-control" value={formGasto.fechaGasto} onChange={e=>setFormGasto({...formGasto, fechaGasto:e.target.value})}/></div>
+                                <div className="form-group"><label>Evidencia (Factura/Foto)</label><input type="file" className="form-control" onChange={e=>setArchivoGasto(e.target.files[0])}/></div>
+                            </div>
+                            <div className="modal-footer"><button className="btn btn-primary">Registrar</button></div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL VER DETALLE */}
+            {modalDetalleOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-content modal-lg">
+                        <div className="modal-header"><h3>Detalle de Gastos: {selectedPresupuesto?.NombreRubro}</h3><button className="modal-close-button" onClick={()=>setModalDetalleOpen(false)}>&times;</button></div>
+                        <div className="modal-body" style={{maxHeight:'60vh', overflowY:'auto'}}>
+                            <table className="data-table">
+                                <thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Evidencia</th></tr></thead>
+                                <tbody>
+                                    {listaGastos.map(g => (
+                                        <tr key={g.ID_Gasto}>
+                                            <td>{new Date(g.FechaGasto).toLocaleDateString()}</td>
+                                            <td>{g.DescripcionGasto}<br/><small style={{color:'#999'}}>Reg: {g.UsuarioRegistra}</small></td>
+                                            <td style={{fontWeight:'bold'}}>{formatMoney(g.MontoGastado)}</td>
+                                            <td>
+                                                {g.RutaEvidencia ? (
+                                                    <a href={`${API_URL}/${g.RutaEvidencia}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary"><BsFileEarmarkArrowUp/> Ver</a>
+                                                ) : 'No adjunto'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {listaGastos.length === 0 && <tr><td colSpan="4">No hay gastos registrados.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default PresupuestoPage;
 
 
 ==================================================================
@@ -19398,6 +20342,52 @@ export const getCurrentToken = () => {
 
 
 ==================================================================
+ARCHIVO: frontend\src\services\budgetService.js
+==================================================================
+import { apiFetch } from './apiService';
+
+export const getPresupuestos = async (anio) => {
+    return apiFetch(`/presupuesto?anio=${anio}`);
+};
+
+export const getDetalleGastos = async (idPresupuesto) => {
+    return apiFetch(`/presupuesto/${idPresupuesto}/gastos`);
+};
+
+export const crearPresupuesto = async (datos) => {
+    return apiFetch('/presupuesto/asignar', {
+        method: 'POST',
+        body: JSON.stringify(datos)
+    });
+};
+
+export const registrarGasto = async (formData) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:5000/api/presupuesto/gastar', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }, // Sin Content-Type por ser FormData
+        body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.msg || 'Error registrando gasto');
+    return data;
+};
+
+export const editarPresupuesto = async (id, datos) => {
+    return apiFetch(`/presupuesto/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(datos)
+    });
+};
+
+export const eliminarPresupuesto = async (id) => {
+    return apiFetch(`/presupuesto/${id}`, {
+        method: 'DELETE'
+    });
+};
+
+
+==================================================================
 ARCHIVO: frontend\src\services\committeeService.js
 ==================================================================
 // frontend/src/services/committeeService.js
@@ -19586,6 +20576,22 @@ export const eliminarCarpeta = async (idCarpeta) => {
     return apiFetch(`/documentos/carpeta/${idCarpeta}`, {
         method: 'DELETE',
     }); 
+};
+
+
+==================================================================
+ARCHIVO: frontend\src\services\historyService.js
+==================================================================
+// frontend/src/services/historyService.js
+import { apiFetch } from './apiService';
+
+// CAMBIO: Recibe cedula
+export const getHistorialColaborador = async (cedula) => {
+    return apiFetch(`/historial/colaborador/${cedula}`);
+};
+
+export const getHistorialActivo = async (idActivo) => {
+    return apiFetch(`/historial/activo/${idActivo}`);
 };
 
 
@@ -20912,8 +21918,8 @@ ARCHIVO: frontend\src\style\LoginPage.css
 
     /* Colores solo para los iconos de selección */
     --icon-sst: #005A5B; 
-    --icon-calidad: #20c997;
     --icon-collab: #007BFF;
+    /* ELIMINADO: --icon-calidad */
 }
 
 /* =========================================
@@ -20935,13 +21941,11 @@ ARCHIVO: frontend\src\style\LoginPage.css
     margin-bottom: 3rem;
 }
 
-/* Logo en la pantalla de selección */
-/* Logo en la pantalla de selección */
 .login-logo-selection {
-    width: 280px;       /* Aumentado de 180px a 280px (Más grande) */
+    width: 280px;
     height: auto;
     margin-bottom: 0rem;
-    margin-top: -5rem;   /* Agregado para bajarlo un poco */
+    margin-top: -5rem;
 }
 .login-header-center h1 { font-size: 2.5rem; color: var(--color-primario); margin: 0; }
 .login-header-center p { font-size: 1.2rem; color: #666; margin: 0.5rem 0 2rem 0; }
@@ -20952,7 +21956,7 @@ ARCHIVO: frontend\src\style\LoginPage.css
     gap: 2rem;
     flex-wrap: wrap;
     justify-content: center;
-    max-width: 1000px;
+    max-width: 800px; /* Ajustado para 2 tarjetas */
 }
 
 .role-card {
@@ -20978,16 +21982,11 @@ ARCHIVO: frontend\src\style\LoginPage.css
     margin-bottom: 1rem;
 }
 .sst-color { color: var(--icon-sst); }
-.calidad-color { color: var(--icon-calidad); }
 .collab-color { color: var(--icon-collab); }
+/* ELIMINADO: .calidad-color */
 
 .role-card h3 { margin: 0 0 0.5rem 0; color: #333; }
 .role-card p { margin: 0; color: #777; font-size: 0.9rem; }
-
-.login-footer-info {
-    margin-top: 4rem;
-    color: #999;
-}
 
 /* =========================================
    VISTA DE FORMULARIO (LOGIN ORIGINAL RESTAURADO)
@@ -21000,10 +21999,9 @@ ARCHIVO: frontend\src\style\LoginPage.css
     box-shadow: var(--shadow-md);
     border-radius: 10px;
     overflow: hidden;
-    position: relative; /* Para el botón volver */
+    position: relative;
 }
 
-/* Botón Volver */
 .btn-back {
     position: absolute;
     top: 20px;
@@ -21022,10 +22020,9 @@ ARCHIVO: frontend\src\style\LoginPage.css
 }
 .btn-back:hover { color: #000; }
 
-/* Columna Izquierda (Visual) */
 .login-visual-column {
     flex: 1;
-    background-color: var(--color-primario); /* SIEMPRE VERDE CORPORATIVO */
+    background-color: var(--color-primario);
     color: var(--color-texto-claro);
     display: flex;
     justify-content: center;
@@ -21049,7 +22046,6 @@ ARCHIVO: frontend\src\style\LoginPage.css
     line-height: 1.6;
 }
 
-/* Columna Derecha (Formulario) */
 .login-form-column {
     flex: 1;
     background-color: var(--color-fondo-tarjeta);
@@ -21064,9 +22060,8 @@ ARCHIVO: frontend\src\style\LoginPage.css
     max-width: 350px;
 }
 
-/* Logo dentro del formulario */
 .login-form-logo {
-    width: 150px; /* Aumentado de 150px a 200px */
+    width: 150px;
     height: auto;
     display: block;
     margin: 0 auto; 
@@ -21090,7 +22085,6 @@ ARCHIVO: frontend\src\style\LoginPage.css
     text-align: center;
 }
 
-/* Inputs */
 .input-group {
     margin-bottom: 1.5rem;
 }

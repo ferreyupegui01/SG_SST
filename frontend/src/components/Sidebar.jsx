@@ -6,12 +6,12 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Sidebar.css'; 
 import logo from "../assets/logo-empaquetados.png";
 
-// Importamos iconos profesionales (Incluyendo los nuevos: BsCurrencyDollar y BsClockHistory)
+// Importamos iconos
 import { 
     BsGrid1X2Fill, BsPeopleFill, BsCalendarWeek, BsClipboard2CheckFill, 
     BsExclamationTriangleFill, BsGraphUpArrow, BsHouseFill, BsCpuFill, 
     BsShieldFillExclamation, BsFillFolderFill, BsHeartPulseFill, BsArchiveFill, 
-    BsFileEarmarkTextFill, BsShieldLockFill, BsJournalCheck, BsListCheck, 
+    BsFileEarmarkTextFill, BsShieldLockFill, BsListCheck, 
     BsBarChartFill, BsConeStriped, BsEnvelopeExclamation, BsJournalRichtext,
     BsFileText, BsCurrencyDollar, BsClockHistory 
 } from 'react-icons/bs';
@@ -20,10 +20,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     const { usuario } = useAuth(); 
     const containerClass = `sidebar-container ${isOpen ? 'open' : ''}`;
 
-    // Definimos los roles claramente
+    // Roles
     const isSuperAdmin = usuario?.rol === 'Super Admin';
     const isAdminSST = usuario?.rol === 'Administrador SST';
-    const isCalidad = usuario?.rol === 'Gestion de Calidad';
     const isColaborador = usuario?.rol === 'Colaborador';
 
     return (
@@ -65,7 +64,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                             <BsCurrencyDollar /> Gestión Presupuesto
                         </NavLink>
 
-                        {/* --- NUEVO ENLACE HISTORIAL --- */}
                         <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
                             <BsClockHistory /> Historial y Trazabilidad
                         </NavLink>
@@ -85,33 +83,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                 )}
 
                 {/* =================================================
-                   MENÚ GESTIÓN DE CALIDAD
-                   ================================================= */}
-                {isCalidad && (
-                    <>
-                        <div className="sidebar-section-label">CALIDAD</div>
-                        <NavLink to="/calidad/dashboard" className="sidebar-link" onClick={onClose}>
-                            <BsJournalCheck /> Dashboard Calidad
-                        </NavLink>
-                        <NavLink to="/documentos" className="sidebar-link" onClick={onClose}>
-                            <BsFillFolderFill /> Gestión Documental
-                        </NavLink>
-                        <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
-                            <BsGraphUpArrow /> Acciones (ACPM)
-                        </NavLink>
-                        
-                        {/* --- NUEVO ENLACE HISTORIAL --- */}
-                        <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
-                            <BsClockHistory /> Trazabilidad
-                        </NavLink>
-
-                        <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
-                            <BsFileText /> Actas de Comité
-                        </NavLink>
-                    </>
-                )}
-
-                {/* =================================================
                    MENÚ OPERATIVO SST (Solo para Admin SST)
                    ================================================= */}
                 {isAdminSST && (
@@ -122,7 +93,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                             <BsGrid1X2Fill /> Dashboard SST
                         </NavLink>
 
-                        {/* --- NUEVO ENLACE HISTORIAL --- */}
                         <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
                             <BsClockHistory /> Historial y Trazabilidad
                         </NavLink>

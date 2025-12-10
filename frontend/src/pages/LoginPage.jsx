@@ -7,11 +7,11 @@ import { useAuth } from '../context/AuthContext';
 import '../style/LoginPage.css';
 import logo from "../assets/logo-empaquetados.png";
 // Iconos
-import { BsShieldCheck, BsJournalCheck, BsPeople, BsArrowLeft, BsPersonFill, BsLockFill } from 'react-icons/bs';
+import { BsShieldCheck, BsPeople, BsArrowLeft, BsPersonFill, BsLockFill } from 'react-icons/bs';
 
 const LoginPage = () => {
     const [view, setView] = useState('SELECCION');
-    const [selectedRoleTitle, setSelectedRoleTitle] = useState(''); // Solo para visualización
+    const [selectedRoleTitle, setSelectedRoleTitle] = useState('');
     const [cedula, setCedula] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -46,9 +46,7 @@ const LoginPage = () => {
 
         setIsLoadingLogin(true);
         try {
-            // El backend valida la credencial y devuelve el rol real del usuario
             await login(cedula, password);
-            // La redirección la maneja el AuthContext o el App.jsx basado en el rol devuelto
         } catch (err) {
             setError(err.message || 'Credenciales incorrectas.');
             setIsLoadingLogin(false);
@@ -67,21 +65,15 @@ const LoginPage = () => {
                 </div>
 
                 <div className="role-cards-container">
-                    {/* TARJETA 1: SG-SST (También entrada para Super Admin) */}
+                   
+                    {/* TARJETA 1: SG-SST */}
                     <div className="role-card" onClick={() => handleSelectRole('Seguridad y Salud en el Trabajo')}>
                         <div className="role-icon sst-color"><BsShieldCheck /></div>
                         <h3>Gestión SG-SST</h3>
                         <p>Administradores y Líderes SST</p>
                     </div>
 
-                    {/* TARJETA 2: CALIDAD (NUEVO) */}
-                    <div className="role-card" onClick={() => handleSelectRole('Gestión de Calidad')}>
-                        <div className="role-icon calidad-color"><BsJournalCheck /></div>
-                        <h3>Gestión de Calidad</h3>
-                        <p>Auditores y Control de Calidad</p>
-                    </div>
-
-                    {/* TARJETA 3: COLABORADOR */}
+                    {/* TARJETA 2: COLABORADOR */}
                     <div className="role-card" onClick={() => handleSelectRole('Colaborador')}>
                         <div className="role-icon collab-color"><BsPeople /></div>
                         <h3>Colaborador</h3>
