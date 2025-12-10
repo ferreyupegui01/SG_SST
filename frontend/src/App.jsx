@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
+// Páginas
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage'; 
 import UsuariosPage from './pages/UsuariosPage';
@@ -24,15 +25,19 @@ import DashboardSuperAdmin from './pages/DashboardSuperAdmin';
 import DashboardCalidad from './pages/DashboardCalidad';
 import GestionFormulariosPage from './pages/GestionFormulariosPage'; 
 import DirectorioExternoPage from './pages/DirectorioExternoPage';
-// --- IMPORTACIÓN NUEVA ---
 import ActasPage from './pages/ActasPage.jsx'; 
+import PresupuestoPage from './pages/PresupuestoPage.jsx';
+// --- IMPORTACIÓN NUEVA ---
+import HistorialPage from './pages/HistorialPage.jsx';
 
+// Layouts
 import MainLayout from './layout/MainLayout'; 
 import ColaboradorLayout from './layout/ColaboradorLayout.jsx'; 
 import ProtectedRoutes from './components/ProtectedRoutes';
 
 const AdminRoutes = () => {
     const { usuario } = useAuth();
+    // Esta ruta incluye a todos los perfiles de gestión
     const tieneAcceso = usuario.rol === 'Super Admin' || usuario.rol === 'Administrador SST' || usuario.rol === 'Gestion de Calidad';
     return tieneAcceso ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
@@ -97,7 +102,7 @@ function App() {
                          <Route path="dashboard" element={<DashboardCalidad />} />
                     </Route>
 
-                    {/* GESTIÓN */}
+                    {/* GESTIÓN Y ADMINISTRACIÓN (RUTAS COMPARTIDAS) */}
                     <Route element={<AdminRoutes />}>
                         <Route path="usuarios" element={<UsuariosPage />} />
                         <Route path="directorio" element={<DirectorioExternoPage />} />
@@ -113,9 +118,11 @@ function App() {
                         <Route path="pesv" element={<PesvPage />} /> 
                         <Route path="solicitudes" element={<SolicitudesPage />} />
                         <Route path="logs" element={<LogsPage />} />
+                        <Route path="actas" element={<ActasPage />} />
+                        <Route path="presupuesto" element={<PresupuestoPage />} />
                         
                         {/* --- RUTA NUEVA --- */}
-                        <Route path="actas" element={<ActasPage />} />
+                        <Route path="historial" element={<HistorialPage />} />
                     </Route>
 
                     {/* COLABORADOR */}

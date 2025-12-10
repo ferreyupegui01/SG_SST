@@ -6,14 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Sidebar.css'; 
 import logo from "../assets/logo-empaquetados.png";
 
-// Importamos iconos profesionales
+// Importamos iconos profesionales (Incluyendo los nuevos: BsCurrencyDollar y BsClockHistory)
 import { 
     BsGrid1X2Fill, BsPeopleFill, BsCalendarWeek, BsClipboard2CheckFill, 
     BsExclamationTriangleFill, BsGraphUpArrow, BsHouseFill, BsCpuFill, 
     BsShieldFillExclamation, BsFillFolderFill, BsHeartPulseFill, BsArchiveFill, 
     BsFileEarmarkTextFill, BsShieldLockFill, BsJournalCheck, BsListCheck, 
     BsBarChartFill, BsConeStriped, BsEnvelopeExclamation, BsJournalRichtext,
-    BsFileText // <--- Icono para Actas
+    BsFileText, BsCurrencyDollar, BsClockHistory 
 } from 'react-icons/bs';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -37,7 +37,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <nav className="sidebar-nav">
                 
                 {/* =================================================
-                   MENÚ EXCLUSIVO SUPER ADMIN (Estratégico + Aprobaciones)
+                   MENÚ EXCLUSIVO SUPER ADMIN
                    ================================================= */}
                 {isSuperAdmin && (
                     <>
@@ -59,6 +59,15 @@ const Sidebar = ({ isOpen, onClose }) => {
 
                         <NavLink to="/super-admin/formularios" className="sidebar-link" onClick={onClose}>
                             <BsListCheck /> Gestor de Formularios
+                        </NavLink>
+                        
+                        <NavLink to="/presupuesto" className="sidebar-link" onClick={onClose}>
+                            <BsCurrencyDollar /> Gestión Presupuesto
+                        </NavLink>
+
+                        {/* --- NUEVO ENLACE HISTORIAL --- */}
+                        <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
+                            <BsClockHistory /> Historial y Trazabilidad
                         </NavLink>
 
                         <div className="sidebar-section-label">APROBACIONES</div>
@@ -90,7 +99,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
                             <BsGraphUpArrow /> Acciones (ACPM)
                         </NavLink>
-                        {/* También pueden ver actas */}
+                        
+                        {/* --- NUEVO ENLACE HISTORIAL --- */}
+                        <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
+                            <BsClockHistory /> Trazabilidad
+                        </NavLink>
+
                         <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
                             <BsFileText /> Actas de Comité
                         </NavLink>
@@ -106,6 +120,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                         
                         <NavLink to="/dashboard" className="sidebar-link" onClick={onClose}>
                             <BsGrid1X2Fill /> Dashboard SST
+                        </NavLink>
+
+                        {/* --- NUEVO ENLACE HISTORIAL --- */}
+                        <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
+                            <BsClockHistory /> Historial y Trazabilidad
+                        </NavLink>
+
+                        <NavLink to="/presupuesto" className="sidebar-link" onClick={onClose}>
+                            <BsCurrencyDollar /> Presupuesto SST
                         </NavLink>
 
                         <NavLink to="/usuarios" className="sidebar-link" onClick={onClose}>
@@ -148,11 +171,9 @@ const Sidebar = ({ isOpen, onClose }) => {
                             <BsGraphUpArrow /> Acciones (ACPM)
                         </NavLink>
                         
-                        {/* --- ENLACE NUEVO --- */}
                         <NavLink to="/actas" className="sidebar-link" onClick={onClose}>
                             <BsFileText /> Actas de Comité
                         </NavLink>
-                        {/* -------------------- */}
 
                         <NavLink to="/solicitudes" className="sidebar-link" onClick={onClose}>
                             <BsEnvelopeExclamation /> Solicitudes a Gerencia
@@ -169,7 +190,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 )}
 
                 {/* =================================================
-                   MENÚ COLABORADOR (Reportes)
+                   MENÚ COLABORADOR
                    ================================================= */}
                 {isColaborador && (
                     <>

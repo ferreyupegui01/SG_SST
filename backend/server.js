@@ -25,6 +25,8 @@ import pesvRoutes from './routes/pesvRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import collabDocsRoutes from './routes/collabDocsRoutes.js';
 import committeeRoutes from './routes/committeeRoutes.js'
+import budgetRoutes from './routes/budgetRoutes.js';
+import historyRoutes from './routes/historyRoutes.js'; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,6 +63,8 @@ app.use('/api/pesv', pesvRoutes);
 app.use('/api/solicitudes', requestRoutes);
 app.use('/api/colaboradores-docs', collabDocsRoutes);
 app.use('/api/actas', committeeRoutes);
+app.use('/api/presupuesto', budgetRoutes);
+app.use('/api/historial', historyRoutes);
 
 initCronJobs();
 

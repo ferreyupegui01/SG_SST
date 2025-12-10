@@ -1,4 +1,4 @@
-CONTEXTO DEL PROYECTO (FECHA: 2025-12-05T16:21:17.083Z):
+CONTEXTO DEL PROYECTO (FECHA: 2025-12-09T12:55:47.900Z):
 
 
 ==================================================================
@@ -996,10 +996,10 @@ const crearActa = async (req, res) => {
             return res.status(400).json({ msg: "La 'Fecha de Reunión' es obligatoria." });
         }
 
-        // Parseo seguro de fechas (null si viene vacío, pero fechaReunion ya validamos que no)
+        // Parseo seguro de fechas
         const valFechaEmision = fechaEmision ? new Date(fechaEmision) : null;
         const valFechaRevision = fechaRevision ? new Date(fechaRevision) : null;
-        const valFechaReunion = new Date(fechaReunion); // Seguro porque ya validamos
+        const valFechaReunion = new Date(fechaReunion);
 
         // 2. Parseo de Listas
         let arrAsistentes = [];
@@ -1077,7 +1077,33 @@ const getActas = async (req, res) => {
     }
 };
 
-export default { crearActa, getActas };
+// --- NUEVA FUNCIÓN: ACTUALIZAR ARCHIVO ---
+const actualizarArchivoActa = async (req, res) => {
+    const { id } = req.params;
+    const archivoNuevo = req.file;
+
+    if (!archivoNuevo) {
+        return res.status(400).json({ msg: 'No se ha subido ningún archivo.' });
+    }
+
+    try {
+        const rutaArchivo = archivoNuevo.path.replace(/\\/g, '/');
+
+        const pool = await poolPromise;
+        await pool.request()
+            .input('idActa', mssql.Int, id)
+            .input('rutaArchivo', mssql.NVarChar, rutaArchivo)
+            .query('EXEC SP_UPDATE_ActaArchivo @idActa, @rutaArchivo');
+
+        res.json({ msg: 'Archivo del acta actualizado correctamente' });
+
+    } catch (error) {
+        console.error("❌ Error actualizando archivo acta:", error);
+        res.status(500).send('Error al actualizar el archivo');
+    }
+};
+
+export default { crearActa, getActas, actualizarArchivoActa };
 
 
 ==================================================================
@@ -1930,6 +1956,7 @@ import { poolPromise, mssql } from '../config/dbConfig.js';
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs'; // Asegúrate de importar fs
 import { logAction } from '../services/logService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1957,7 +1984,6 @@ const crearExamenMedico = async (req, res) => {
         tipoExamen, fechaExamen, conceptoAptitud,
         recomendacionesGenerales, observaciones, recomendacionesOcupacionales, 
         medicoEspecialista, entidadEmite, resumenCaso, compromisos,
-        // Usamos la fecha en lugar de la duración texto
         fechaFinRecomendaciones 
     } = req.body;
     
@@ -1980,11 +2006,7 @@ const crearExamenMedico = async (req, res) => {
             .input('entidadEmite', mssql.NVarChar, entidadEmite || null)
             .input('resumenCaso', mssql.NVarChar, resumenCaso || null)
             .input('compromisos', mssql.NVarChar, compromisos || null)
-            
-            // Enviamos la fecha al SP
             .input('fechaFinRecomendaciones', mssql.Date, fechaFinRecomendaciones || null)
-            
-            // Nota: Quitamos @duracionRecomendaciones porque ya no existe en la tabla
             .query('EXEC SP_CREATE_ExamenMedico @idUsuarioColaborador, @idUsuarioAdminRegistra, @tipoExamen, @fechaExamen, @conceptoAptitud, @recomendacionesGenerales, @observaciones, @recomendacionesOcupacionales, @medicoEspecialista, @entidadEmite, @fechaFinRecomendaciones, @resumenCaso, @compromisos, @nombreColaborador, @cedulaColaborador');
 
         await logAction(req.usuario.id, req.usuario.nombre, 'CREAR_EXAMEN', `Registró examen para: ${nombreColaborador}`);
@@ -2011,9 +2033,13 @@ const getExamenMedicoDetalle = async (req, res) => {
     }
 };
 
-// --- GENERAR PDF (ESTRUCTURA ORIGINAL RESTAURADA) ---
+// --- GENERAR PDF CON NUEVO ENCABEZADO (ACTUALIZADO) ---
 const generarPdfRecomendaciones = async (req, res) => {
     const { id } = req.params;
+    
+    // Recibimos los datos del encabezado desde el body (POST)
+    const { codigo, version, fechaEmision, fechaRevision } = req.body;
+
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -2026,92 +2052,114 @@ const generarPdfRecomendaciones = async (req, res) => {
 
         const data = result.recordset[0];
         
-        // 1. Configuración Documento
-        const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+        // Configuración Documento
+        const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true }); // Margen ajustado a 40 para coincidir
         const filename = `Recomendaciones-${data.CedulaColaborador || 'NA'}.pdf`;
+        
+        // Headers para descarga directa
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         doc.pipe(res);
 
-        const startX = 50;
-        let y = 40; 
+        const fontBold = 'Helvetica-Bold';
+        const fontReg = 'Helvetica';
+        const black = '#000000';
 
-        // === LOGO ===
+        // ==========================================
+        // 1. ENCABEZADO ESTRUCTURADO (TABLA)
+        // ==========================================
+        const startY = 40; 
+        const startX = 40;
+        const col1W = 100; // Logo
+        const col2W = 280; // Título
+        const col3W = 150; // Datos Control
+        const hHeader = 70;
+
+        // Bordes Tabla
+        doc.rect(startX, startY, col1W + col2W + col3W, hHeader).stroke();
+        doc.moveTo(startX + col1W, startY).lineTo(startX + col1W, startY + hHeader).stroke();
+        doc.moveTo(startX + col1W + col2W, startY).lineTo(startX + col1W + col2W, startY + hHeader).stroke();
+        
+        const rowH = hHeader / 4;
+        doc.moveTo(startX + col1W + col2W, startY + rowH).lineTo(startX + col1W + col2W + col3W, startY + rowH).stroke();
+        doc.moveTo(startX + col1W + col2W, startY + rowH * 2).lineTo(startX + col1W + col2W + col3W, startY + rowH * 2).stroke();
+        doc.moveTo(startX + col1W + col2W, startY + rowH * 3).lineTo(startX + col1W + col2W + col3W, startY + rowH * 3).stroke();
+
+        // --- LOGO ---
         const logoPath = path.resolve(__dirname, '..', 'assets', 'logo.png');
-        let logoHeight = 0;
-        try {
-            doc.image(logoPath, 60, 10, { width: 120 });
-            logoHeight = 60;
-        } catch {
-            doc.font('Helvetica-Bold').text('EMPRESA', startX, y);
-            logoHeight = 20;
+        if (fs.existsSync(logoPath)) {
+            try { doc.image(logoPath, startX + 10, startY + 4, { width: 80 }); } 
+            catch (e) { console.warn('Logo error', e); }
         }
 
-        // === ENCABEZADO ===
-        const headerX = startX + 120;
-        const headerWidth = 390;
+        // --- TÍTULO CENTRAL ---
+        // Título Principal del Sistema
+        doc.font(fontBold).fontSize(10).fillColor(black)
+           .text('SISTEMA DE GESTIÓN DE SEGURIDAD Y SALUD EN EL TRABAJO (SG-SST)', startX + col1W, startY + 18, { width: col2W, align: 'center' });
         
-        doc.font('Helvetica-Bold').fontSize(14).fillColor('#000000')
-           .text('Acta de notificación de restricciones y/o recomendaciones médicas',
-               headerX, y + 5, { align: 'center', width: headerWidth });
-        
-        doc.moveDown(0.3);
-        
-        // Guardar Y para paginación
-        const subtitleY = doc.y; 
-        doc.fontSize(9);
-        doc.moveDown(1); 
+        // Título del Documento Específico
+        doc.font(fontBold).fontSize(10)
+           .text('ACTA DE NOTIFICACIÓN DE RECOMENDACIONES MÉDICAS', startX + col1W, startY + 42, { width: col2W, align: 'center' });
 
-        doc.moveDown(2);
-        doc.y = y + logoHeight + 30;
-        doc.fillColor('#000000'); 
+        // --- DATOS DE CONTROL (DERECHA) ---
+        doc.font(fontBold).fontSize(8);
+        doc.text(`CÓDIGO: ${codigo || 'SST-FTO-001'}`, startX + col1W + col2W + 5, startY + 7);
+        doc.text(`FECHA EMISIÓN: ${fechaEmision || ''}`, startX + col1W + col2W + 5, startY + rowH + 7);
+        doc.text(`FECHA REVISIÓN: ${fechaRevision || ''}`, startX + col1W + col2W + 5, startY + (rowH * 2) + 7);
+        doc.text(`VERSIÓN: ${version || '1'}`, startX + col1W + col2W + 5, startY + (rowH * 3) + 7);
 
-        // Función Helper Original
+        // ==========================================
+        // 2. CUERPO DEL DOCUMENTO
+        // ==========================================
+        
+        // Resetear cursor debajo del encabezado
+        doc.x = startX;
+        doc.y = startY + hHeader + 40;
+        
+        const contentWidth = 530; // Ancho útil
+
         const seccion = (titulo) => {
             doc.moveDown(1);
-            doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000')
-                .text(titulo.toUpperCase(), startX);
+            doc.font(fontBold).fontSize(11).fillColor(black)
+                .text(titulo.toUpperCase());
             doc.moveDown(0.4);
-            doc.font('Helvetica').fontSize(10).fillColor('#000000');
+            doc.font(fontReg).fontSize(10).fillColor(black);
         };
 
-        // === DATOS (Estructura Original) ===
-        let contentX = 50;
-        let contentY = doc.y;
-        doc.y = contentY;
-
-        seccion("Datos del colaborador");
-        doc.text(`Nombre: ${data.NombreColaborador || ''}`, contentX);
-        doc.text(`C.C: ${data.CedulaColaborador || ''}`, contentX);
+        // --- DATOS DEL COLABORADOR ---
+        doc.font(fontBold).text("DATOS GENERALES:", { underline: true });
+        doc.moveDown(0.5);
         
         const fechaExamenStr = data.FechaExamen ? new Date(data.FechaExamen).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : 'N/A';
-        doc.text(`Fecha del Examen: ${fechaExamenStr}`, contentX);
-        
-        doc.text(`Tipo de Examen: ${data.TipoExamen || ''}`, contentX);
-        doc.text(`Concepto de Aptitud: ${data.ConceptoAptitud || ''}`, contentX);
-
-        seccion("Información del concepto");
-        doc.text(`Persona que emite el concepto (Médico): ${data.MedicoEspecialista || 'No registra'}`, contentX);
-        doc.text(`Entidad que emite el concepto (ARL/EPS): ${data.EntidadEmite || 'No registra'}`, contentX);
-        
-        // CAMBIO AQUÍ: Usamos la fecha en vez del texto de duración
         let fechaFinStr = 'Indefinida / No aplica';
         if (data.FechaFinRecomendaciones) {
             fechaFinStr = new Date(data.FechaFinRecomendaciones).toLocaleDateString('es-CO', { timeZone: 'UTC' });
         }
-        doc.text(`Fecha de terminación de recomendaciones: ${fechaFinStr}`, contentX);
+
+        // Tabla visual simulada con tabulaciones
+        doc.font(fontBold).fontSize(10);
+        doc.text(`Nombre: `, { continued: true }); doc.font(fontReg).text(data.NombreColaborador);
+        doc.font(fontBold).text(`Cédula: `, { continued: true }); doc.font(fontReg).text(data.CedulaColaborador);
+        doc.font(fontBold).text(`Fecha del Examen: `, { continued: true }); doc.font(fontReg).text(fechaExamenStr);
+        doc.font(fontBold).text(`Tipo de Examen: `, { continued: true }); doc.font(fontReg).text(data.TipoExamen);
+        doc.font(fontBold).text(`Concepto: `, { continued: true }); doc.font(fontReg).text(data.ConceptoAptitud);
+        
+        doc.moveDown(0.5);
+        doc.font(fontBold).text(`Médico Emisor: `, { continued: true }); doc.font(fontReg).text(data.MedicoEspecialista || 'No registra');
+        doc.font(fontBold).text(`Entidad (EPS/ARL): `, { continued: true }); doc.font(fontReg).text(data.EntidadEmite || 'No registra');
+        doc.font(fontBold).text(`Vigencia Recomendaciones: `, { continued: true }); doc.font(fontReg).text(fechaFinStr);
 
         seccion("Temas tratados: breve resumen del caso");
-        doc.text(data.ResumenCaso || 'No se registró un resumen del caso.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.ResumenCaso || 'No se registró un resumen del caso.', { width: contentWidth, align: 'justify' });
 
         seccion("Ampliación de las recomendaciones médicas (no ocupacionales)");
-        doc.text(data.RecomendacionesGenerales || 'Sin recomendaciones médicas generales.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.RecomendacionesGenerales || 'Sin recomendaciones médicas generales.', { width: contentWidth, align: 'justify' });
 
         seccion("Recomendaciones ocupacionales (para el trabajo)");
-        doc.text(data.RecomendacionesOcupacionales || 'Sin recomendaciones ocupacionales específicas.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.RecomendacionesOcupacionales || 'Sin recomendaciones ocupacionales específicas.', { width: contentWidth, align: 'justify' });
 
         seccion("Compromisos");
-        doc.text(data.Compromisos || 'Sin compromisos registrados.', contentX, doc.y, { width: 480, align: 'justify' });
+        doc.text(data.Compromisos || 'Sin compromisos registrados.', { width: contentWidth, align: 'justify' });
 
         // === FIRMAS ===
         if (doc.y > 600) doc.addPage(); 
@@ -2119,13 +2167,13 @@ const generarPdfRecomendaciones = async (req, res) => {
         doc.moveDown(4);
         seccion("En constancia de lo anterior se firma por parte de los asistentes:");
         doc.moveDown(3);
-        doc.font('Helvetica').fontSize(10);
+        doc.font(fontReg).fontSize(10);
         
-        doc.text('___________________________________', contentX);
-        doc.text('Nombre:', contentX);
-        doc.text('Cargo/Empresa:', contentX);
-        doc.text('N° Identificación:', contentX);
-        doc.text('Firma:', contentX);
+        doc.text('___________________________________');
+        doc.text('Nombre:');
+        doc.text('Cargo/Empresa:');
+        doc.text('N° Identificación:');
+        doc.text('Firma:');
 
         // === NUMERACIÓN DE PÁGINAS ===
         const range = doc.bufferedPageRange();
@@ -2133,18 +2181,10 @@ const generarPdfRecomendaciones = async (req, res) => {
 
         for (let i = 0; i < totalPages; i++) {
             doc.switchToPage(i);
-            if (i === 0) {
-                const fechaEmision = new Date().toLocaleDateString('es-CO');
-                doc.font('Helvetica').fontSize(9).fillColor('#6c757d')
-                   .text(
-                       `Fecha Emisión: ${fechaEmision}    Fecha Revisión: ${fechaEmision}    Páginas: ${i + 1} de ${totalPages}`,
-                       headerX, subtitleY, { align: 'center', width: headerWidth }
-                   );
-            } else {
-                doc.font('Helvetica').fontSize(9).fillColor('#6c757d')
-                   .text(`Página ${i + 1} de ${totalPages}`, 50, 30, { align: 'right' });
-            }
+            doc.fontSize(8).fillColor('#6c757d')
+               .text(`Página ${i + 1} de ${totalPages}`, 0, 730, { align: 'center', width: 612 });
         }
+        
         doc.end();
 
     } catch (err) {
@@ -2225,7 +2265,7 @@ ARCHIVO: backend\controllers\pesvController.js
 
 import { poolPromise, mssql } from '../config/dbConfig.js';
 import { generarActaPDF } from '../utils/pdfGenerator.js';
-import { obtenerConductoresGosen } from '../services/externalApiService.js'; // Servicio de integración
+import { obtenerConductoresGosen } from '../services/externalApiService.js'; 
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -2286,61 +2326,45 @@ const reemplazarEvidencia = async (req, res) => {
 const getConductoresPESV = async (req, res) => {
     try {
         // A. Obtener listado maestro de la API Externa (Gosen)
-        // Trae a todos los activos con cargo de Conductor, Chofer, Montacarguista, etc.
         const conductoresExternos = await obtenerConductoresGosen();
 
-        // B. Obtener datos locales (Todos los usuarios activos con info de licencia)
-        // Usamos el SP corregido que NO filtra por cargo para encontrar coincidencias por cédula
+        // B. Obtener datos locales
         const pool = await poolPromise;
         const resultLocal = await pool.request().query('EXEC SP_GET_ConductoresPESV');
         const conductoresLocales = resultLocal.recordset;
 
-        // C. Cruzar información (Merge con Prioridad Local)
+        // C. Cruzar información
         const listaUnificada = conductoresExternos.map(externo => {
-            
-            // Validación estricta de Cédula (Strings sin espacios)
             const cedulaExterna = String(externo.Cedula).trim();
-            
             const localData = conductoresLocales.find(local => 
                 String(local.CedulaUsuario).trim() === cedulaExterna
             );
 
             if (localData) {
-                // CASO 1: EL USUARIO YA EXISTE LOCALMENTE
-                // Se habilitará el botón "Gestionar" porque tenemos ID_Usuario
+                // EXISTE LOCALMENTE
                 return {
-                    // Datos Visuales (Preferimos Gosen por estar actualizados)
                     NombreCompleto: externo.NombreCompleto,
                     CedulaUsuario: externo.Cedula,
                     Cargo: externo.CargoNombre || localData.Cargo, 
-                    
-                    // Datos de Gestión (Vienen EXCLUSIVAMENTE de la BD Local)
                     ID_Usuario: localData.ID_Usuario, 
                     NumeroLicencia: localData.NumeroLicencia,
                     Categoria: localData.Categoria,
                     VencimientoLicencia: localData.VencimientoLicencia,
-                    
-                    // --- IMPORTANTE: Ruta del archivo para ver/descargar ---
                     RutaLicencia: localData.RutaLicencia, 
-                    
-                    // Estado para el Frontend
                     EstadoRegistro: 'Registrado',
                     OrigenDatos: 'Local + Gosen'
                 };
             } else {
-                // CASO 2: SOLO EXISTE EN GOSEN
-                // ID_Usuario es null -> Frontend mostrará botón "Crear Usuario"
+                // SOLO EN GOSEN
                 return {
                     NombreCompleto: externo.NombreCompleto,
                     CedulaUsuario: externo.Cedula,
                     Cargo: externo.CargoNombre,
-                    
                     ID_Usuario: null, 
                     NumeroLicencia: null,
                     Categoria: null,
                     VencimientoLicencia: null,
                     RutaLicencia: null,
-                    
                     EstadoRegistro: 'Pendiente',
                     OrigenDatos: 'Solo Gosen'
                 };
@@ -2357,7 +2381,6 @@ const getConductoresPESV = async (req, res) => {
 
 const guardarInfoConductor = async (req, res) => {
     const { idUsuario, numeroLicencia, categoria, vencimiento } = req.body;
-    // Si se subió archivo, guardamos la ruta. Si no, enviamos null (el SP mantiene la anterior).
     const archivoLicencia = req.file ? req.file.path.replace(/\\/g, '/') : null;
     
     try {
@@ -2382,10 +2405,7 @@ const guardarInfoConductor = async (req, res) => {
 // ==========================================
 
 const crearMantenimiento = async (req, res) => {
-    // Extraemos datos del body
     const { idActivo, tipo, fecha, kilometraje, descripcion, taller, costo } = req.body;
-    
-    // Capturamos el archivo si existe
     const archivoEvidencia = req.file ? req.file.path.replace(/\\/g, '/') : null;
 
     try {
@@ -2398,7 +2418,7 @@ const crearMantenimiento = async (req, res) => {
             .input('descripcion', mssql.NVarChar, descripcion)
             .input('taller', mssql.NVarChar, taller)
             .input('costo', mssql.Decimal(18, 2), costo)
-            .input('rutaEvidencia', mssql.NVarChar, archivoEvidencia) // <--- Nuevo parámetro
+            .input('rutaEvidencia', mssql.NVarChar, archivoEvidencia)
             .query('EXEC SP_CREATE_Mantenimiento @idActivo, @tipo, @fecha, @kilometraje, @descripcion, @taller, @costo, @rutaEvidencia');
         
         res.json({ msg: 'Mantenimiento registrado correctamente' });
@@ -2465,22 +2485,90 @@ const actualizarPasoPESV = async (req, res) => {
 };
 
 // ==========================================
-// 5. GENERACIÓN DE DOCUMENTOS Y PLANTILLAS
+// 5. GENERACIÓN DE DOCUMENTOS (ACTUALIZADO)
 // ==========================================
 
 const guardarConfiguracionPlantilla = async (req, res) => {
-    const { idPaso, titulo, cuerpo, campos } = req.body; 
+    // Recibimos la configuración base desde el panel del Super Admin
+    const { 
+        idPaso, titulo, cuerpo, campos,
+        codigo, version, fechaEmision, fechaRevision 
+    } = req.body; 
+
     try {
         const pool = await poolPromise;
         const jsonCampos = JSON.stringify(campos);
-        await pool.request()
-            .input('idPaso', mssql.Int, idPaso)
-            .input('titulo', mssql.NVarChar, titulo)
-            .input('cuerpo', mssql.NVarChar, cuerpo)
-            .input('jsonCampos', mssql.NVarChar(mssql.MAX), jsonCampos)
-            .query('EXEC SP_SAVE_PlantillaPESV @idPaso, @titulo, @cuerpo, @jsonCampos');
-        res.json({ msg: 'Configuración de plantilla guardada' });
-    } catch (err) { console.error(err); res.status(500).send('Error guardando plantilla'); }
+        
+        // Validación de fechas
+        const fEmision = fechaEmision ? new Date(fechaEmision) : null;
+        const fRevision = fechaRevision ? new Date(fechaRevision) : null;
+
+        const check = await pool.request().input('idPaso', mssql.Int, idPaso).query('SELECT ID_Plantilla FROM PlantillasDocPESV WHERE ID_Paso = @idPaso');
+        
+        let idPlantilla;
+
+        if (check.recordset.length > 0) {
+            // UPDATE
+            idPlantilla = check.recordset[0].ID_Plantilla;
+            await pool.request()
+                .input('idPaso', mssql.Int, idPaso)
+                .input('titulo', mssql.NVarChar, titulo)
+                .input('cuerpo', mssql.NVarChar, cuerpo)
+                .input('codigo', mssql.NVarChar, codigo)
+                .input('version', mssql.NVarChar, version)
+                .input('fEmision', mssql.Date, fEmision)
+                .input('fRevision', mssql.Date, fRevision)
+                .query(`
+                    UPDATE PlantillasDocPESV 
+                    SET TituloDocumento = @titulo, CuerpoInicial = @cuerpo,
+                        CodigoDocumento = @codigo, Version = @version,
+                        FechaEmision = @fEmision, FechaRevision = @fRevision
+                    WHERE ID_Paso = @idPaso
+                `);
+            
+            // Borrar campos viejos
+            await pool.request().input('idPlantilla', mssql.Int, idPlantilla).query('DELETE FROM CamposPlantillaPESV WHERE ID_Plantilla = @idPlantilla');
+        } else {
+            // INSERT
+            const result = await pool.request()
+                .input('idPaso', mssql.Int, idPaso)
+                .input('titulo', mssql.NVarChar, titulo)
+                .input('cuerpo', mssql.NVarChar, cuerpo)
+                .input('codigo', mssql.NVarChar, codigo)
+                .input('version', mssql.NVarChar, version)
+                .input('fEmision', mssql.Date, fEmision)
+                .input('fRevision', mssql.Date, fRevision)
+                .query(`
+                    INSERT INTO PlantillasDocPESV (ID_Paso, TituloDocumento, CuerpoInicial, CodigoDocumento, Version, FechaEmision, FechaRevision)
+                    VALUES (@idPaso, @titulo, @cuerpo, @codigo, @version, @fEmision, @fRevision);
+                    SELECT SCOPE_IDENTITY() AS id;
+                `);
+            idPlantilla = result.recordset[0].id;
+        }
+
+        // Insertar Campos
+        if (campos && campos.length > 0) {
+            const table = new mssql.Table('CamposPlantillaPESV');
+            table.create = false;
+            table.columns.add('ID_Plantilla', mssql.Int, { nullable: false });
+            table.columns.add('Etiqueta', mssql.NVarChar(100), { nullable: false });
+            table.columns.add('TipoInput', mssql.NVarChar(20), { nullable: false });
+            table.columns.add('Orden', mssql.Int, { nullable: false });
+
+            campos.forEach(c => {
+                table.rows.add(idPlantilla, c.label, c.tipo, c.orden);
+            });
+
+            const request = new mssql.Request(pool);
+            await request.bulk(table);
+        }
+
+        res.json({ msg: 'Configuración guardada exitosamente' });
+
+    } catch (err) { 
+        console.error(err); 
+        res.status(500).send('Error guardando plantilla'); 
+    }
 };
 
 const getPlantillaPaso = async (req, res) => {
@@ -2494,23 +2582,47 @@ const getPlantillaPaso = async (req, res) => {
 };
 
 const generarDocumentoPaso = async (req, res) => {
-    const { idPaso, datosFormulario } = req.body; 
+    // --- AQUÍ RECIBIMOS 'headerData' (Datos editados por el usuario al generar) ---
+    const { idPaso, datosFormulario, headerData } = req.body; 
+    
     try {
         const pool = await poolPromise;
         const resultConfig = await pool.request().input('idPaso', mssql.Int, idPaso).query('EXEC SP_GET_PlantillaPaso @idPaso');
-        if (resultConfig.recordsets[0].length === 0) return res.status(400).json({ msg: 'No hay plantilla configurada para este paso' });
+        
+        if (resultConfig.recordsets[0].length === 0) {
+            return res.status(400).json({ msg: 'No hay plantilla configurada para este paso' });
+        }
 
         const configBD = resultConfig.recordsets[0][0];
         const camposBD = resultConfig.recordsets[1];
-        const camposLlenos = camposBD.map(c => ({ label: c.Etiqueta, valor: datosFormulario[c.Etiqueta] || '---' }));
+        
+        const camposLlenos = camposBD.map(c => ({ 
+            label: c.Etiqueta, 
+            valor: datosFormulario[c.Etiqueta] || '---' 
+        }));
 
         const nombreArchivo = `Generado_Paso${idPaso}_${Date.now()}.pdf`;
         const rutaAbsoluta = path.join(__dirname, '../uploads', nombreArchivo);
         const rutaRelativa = `uploads/${nombreArchivo}`;
 
-        await generarActaPDF({ titulo: configBD.TituloDocumento, cuerpo: configBD.CuerpoInicial, camposLlenos: camposLlenos }, null, rutaAbsoluta);
+        // PRIORIDAD: Si el usuario envió headerData (desde el modal de generar), usamos eso.
+        // Si no, usamos los valores por defecto de la BD.
+        const datosHeader = {
+            titulo: configBD.TituloDocumento,
+            cuerpo: configBD.CuerpoInicial,
+            camposLlenos: camposLlenos,
+            
+            // Datos dinámicos vs BD
+            codigo: headerData?.codigo || configBD.CodigoDocumento,
+            version: headerData?.version || configBD.Version,
+            fechaEmision: headerData?.fechaEmision || (configBD.FechaEmision ? new Date(configBD.FechaEmision).toISOString().split('T')[0] : ''),
+            fechaRevision: headerData?.fechaRevision || (configBD.FechaRevision ? new Date(configBD.FechaRevision).toISOString().split('T')[0] : '')
+        };
 
-        // Guardar automáticamente como evidencia del paso y marcar como realizado
+        // Generamos el PDF con el encabezado correcto
+        await generarActaPDF(datosHeader, null, rutaAbsoluta);
+
+        // Guardar automáticamente como evidencia
         await pool.request()
             .input('idPaso', mssql.Int, idPaso)
             .input('estado', mssql.NVarChar, 'Realizado')
@@ -2523,7 +2635,7 @@ const generarDocumentoPaso = async (req, res) => {
 };
 
 // ==========================================
-// 6. CRUD DE PASOS (SUPER ADMIN)
+// 6. CRUD DE PASOS (SUPER ADMIN / ADMIN SST)
 // ==========================================
 
 const crearPaso = async (req, res) => {
@@ -2571,9 +2683,9 @@ export default {
     getPasosPESV, 
     getEvidenciasPorPaso, 
     actualizarPasoPESV,
-    guardarConfiguracionPlantilla, 
-    getPlantillaPaso,
-    generarDocumentoPaso,
+    guardarConfiguracionPlantilla, // Para guardar defaults (Super Admin)
+    getPlantillaPaso, 
+    generarDocumentoPaso, // Para generar PDF con datos editados en modal
     crearPaso, 
     editarPasoInfo, 
     eliminarPaso,
@@ -3942,14 +4054,14 @@ ARCHIVO: backend\routes\committeeRoutes.js
 // backend/routes/committeeRoutes.js
 import express from 'express';
 import committeeController from '../controllers/committeeController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
 const router = express.Router();
 
-// Configurar subida de archivos (en caso de subir acta manual)
+// Configurar subida de archivos
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = 'uploads/actas/';
@@ -3957,13 +4069,19 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (req, file, cb) => {
-        cb(null, `ActaManual_${Date.now()}${path.extname(file.originalname)}`);
+        // Nombre único con timestamp
+        cb(null, `Acta_${Date.now()}_${path.extname(file.originalname)}`);
     }
 });
 const upload = multer({ storage: storage });
 
+// Rutas
 router.post('/', [protect], upload.single('archivoManual'), committeeController.crearActa);
 router.get('/', [protect], committeeController.getActas);
+
+// --- RUTA NUEVA: ACTUALIZAR ARCHIVO ---
+// Usamos upload.single('archivo') porque así lo llamaremos desde el front
+router.put('/:id/archivo', [protect, admin], upload.single('archivo'), committeeController.actualizarArchivoActa);
 
 export default router;
 
@@ -4243,7 +4361,6 @@ import express from 'express';
 import { check } from 'express-validator';
 import medicalController from '../controllers/medicalController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
-
 const router = express.Router();
 
 // GET /api/medicina (Historial)
@@ -4267,19 +4384,15 @@ router.post(
     medicalController.crearExamenMedico
 );
 
-/**
- * @route   GET /api/medicina/:id
- * @desc    Obtener detalle de UN examen (para el modal "Ver Detalle")
- * @access  Privado (Admin)
- */
+// GET /api/medicina/:id (Obtener detalle)
 router.get(
     '/:id',
     [ protect, admin ],
-    medicalController.getExamenMedicoDetalle // <-- ¡CORREGIDO!
+    medicalController.getExamenMedicoDetalle 
 );
 
-// GET /api/medicina/:id/pdf (Generar PDF)
-router.get(
+// --- CAMBIO AQUÍ: POST en lugar de GET para recibir datos del encabezado ---
+router.post(
     '/:id/pdf',
     [ protect, admin ],
     medicalController.generarPdfRecomendaciones 
@@ -4917,7 +5030,7 @@ export const generarActaComitePDF = (data, asistentes, compromisos, rutaSalida) 
             // Si quieres subirlo más, disminuye el valor sumado a startY (ej: startY + 1)
             if (fs.existsSync(logoPath)) {
                 try {
-                    doc.image(logoPath, startX + 10, startY + 4, { width: 80 }); 
+                    doc.image(logoPath, startX + 10, startY + 6, { width: 80 }); 
                 } catch (imgErr) { console.warn('Error cargando logo:', imgErr); }
             }
             
@@ -5110,6 +5223,10 @@ ARCHIVO: backend\utils\pdfGenerator.js
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const generarActaPDF = (configuracion, datosUsuario, rutaSalida) => {
     return new Promise((resolve, reject) => {
@@ -5119,70 +5236,132 @@ export const generarActaPDF = (configuracion, datosUsuario, rutaSalida) => {
                 fs.mkdirSync(directorio, { recursive: true });
             }
 
-            const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+            // Margen de 40 puntos
+            const doc = new PDFDocument({ margin: 40, size: 'LETTER', bufferPages: true });
             const stream = fs.createWriteStream(rutaSalida);
 
             doc.pipe(stream);
 
-            // --- ENCABEZADO ---
-            doc.rect(50, 40, 510, 70).stroke();
+            const fontBold = 'Helvetica-Bold';
+            const fontReg = 'Helvetica';
+            const black = '#000000';
+
+            // ==========================================
+            // 1. ENCABEZADO ESTRUCTURADO (TABLA)
+            // ==========================================
             
-            doc.fontSize(16).font('Helvetica-Bold').text('EMPAQUETADOS EL TRECE S.A.S', 60, 55, { align: 'center', width: 490 });
-            doc.fontSize(10).font('Helvetica').text('NIT: 900.123.456-7', { align: 'center' });
-            doc.fontSize(10).font('Helvetica-Oblique').text('PLAN ESTRATÉGICO DE SEGURIDAD VIAL (PESV)', { align: 'center' });
-            doc.moveDown(3);
+            const startY = 40; 
+            const startX = 40; // Margen izquierdo
+            const col1W = 100; // Ancho Logo
+            const col2W = 280; // Ancho Título
+            const col3W = 150; // Ancho Datos Control
+            const hHeader = 70; // Altura Total Header
+            
+            // Ancho útil de la página para el texto (Ancho total - Márgenes)
+            // Letter width ~612. Margin 40 left + 40 right = 80. Content Width = 532.
+            const contentWidth = 530; 
 
-            // --- TÍTULO ---
-            doc.fontSize(14).font('Helvetica-Bold').text(configuracion.titulo.toUpperCase(), { align: 'center', underline: true });
-            doc.moveDown();
+            // Dibujar Líneas de la Tabla del Encabezado
+            doc.rect(startX, startY, col1W + col2W + col3W, hHeader).stroke(); // Borde exterior
+            doc.moveTo(startX + col1W, startY).lineTo(startX + col1W, startY + hHeader).stroke(); // Divisor Logo-Título
+            doc.moveTo(startX + col1W + col2W, startY).lineTo(startX + col1W + col2W, startY + hHeader).stroke(); // Divisor Título-Datos
+            
+            // Líneas horizontales de la columna de datos
+            const rowH = hHeader / 4;
+            doc.moveTo(startX + col1W + col2W, startY + rowH).lineTo(startX + col1W + col2W + col3W, startY + rowH).stroke();
+            doc.moveTo(startX + col1W + col2W, startY + rowH * 2).lineTo(startX + col1W + col2W + col3W, startY + rowH * 2).stroke();
+            doc.moveTo(startX + col1W + col2W, startY + rowH * 3).lineTo(startX + col1W + col2W + col3W, startY + rowH * 3).stroke();
 
-            // --- FECHA (SIN CIUDAD) ---
-            const fechaActual = new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            doc.fontSize(11).font('Helvetica').text(`Fecha de emisión: ${fechaActual}`, { align: 'right' });
-            doc.moveDown(2);
+            // --- LOGO ---
+            const logoPath = path.resolve(__dirname, '..', 'assets', 'logo.png');
+            if (fs.existsSync(logoPath)) {
+                try {
+                    doc.image(logoPath, startX + 10, startY + 4, { width: 80 }); 
+                } catch (imgErr) { console.warn('Error cargando logo:', imgErr); }
+            }
+
+            // --- TÍTULO CENTRAL ---
+            doc.font(fontBold).fontSize(11).fillColor(black)
+               .text('PLAN ESTRATÉGICO DE SEGURIDAD VIAL (PESV)', startX + col1W, startY + 20, { width: col2W, align: 'center' });
+            
+            // Subtítulo dinámico
+            doc.fontSize(10).font(fontReg)
+               .text(configuracion.titulo.toUpperCase(), startX + col1W, startY + 40, { width: col2W, align: 'center' });
+
+            // --- DATOS DE CONTROL (DERECHA) ---
+            doc.font(fontBold).fontSize(8);
+            doc.text(`CÓDIGO: ${configuracion.codigo || 'PESV-FTO-001'}`, startX + col1W + col2W + 5, startY + 7);
+            doc.text(`FECHA EMISIÓN: ${configuracion.fechaEmision || ''}`, startX + col1W + col2W + 5, startY + rowH + 7);
+            doc.text(`FECHA REVISIÓN: ${configuracion.fechaRevision || ''}`, startX + col1W + col2W + 5, startY + (rowH * 2) + 7);
+            doc.text(`VERSIÓN: ${configuracion.version || '1'}`, startX + col1W + col2W + 5, startY + (rowH * 3) + 7);
+
+            // ==========================================
+            // 2. CUERPO DEL DOCUMENTO (CORREGIDO)
+            // ==========================================
+
+            // --- IMPORTANTE: RESETEAR CURSOR ---
+            // Forzamos X al margen izquierdo y Y debajo del header con un espacio
+            doc.x = startX;
+            doc.y = startY + hHeader + 40; 
 
             // --- CUERPO FIJO ---
             if (configuracion.cuerpo) {
-                doc.fontSize(11).font('Helvetica').text(configuracion.cuerpo, { align: 'justify', lineGap: 4 });
-                doc.moveDown();
+                doc.font(fontReg).fontSize(11)
+                   .text(configuracion.cuerpo, { 
+                       align: 'justify', 
+                       lineGap: 4,
+                       width: contentWidth // Forzamos el ancho para que ocupe toda la página
+                   });
+                doc.moveDown(1.5);
             }
 
             // --- CAMPOS DINÁMICOS ---
             if (configuracion.camposLlenos && configuracion.camposLlenos.length > 0) {
-                doc.font('Helvetica-Bold').text('INFORMACIÓN ESPECÍFICA:', { underline: true });
+                // Título de sección
+                doc.font(fontBold).fontSize(11).text('INFORMACIÓN ESPECÍFICA:', { underline: true });
                 doc.moveDown(0.5);
 
+                // Lista de campos
                 configuracion.camposLlenos.forEach(campo => {
-                    doc.font('Helvetica-Bold').text(`• ${campo.label}: `, { continued: true });
-                    doc.font('Helvetica').text(campo.valor);
+                    // Usamos continued: true para que valor quede al lado de la etiqueta
+                    doc.font(fontBold).text(`• ${campo.label}: `, { continued: true });
+                    doc.font(fontReg).text(campo.valor);
                     doc.moveDown(0.3);
                 });
                 doc.moveDown(2);
             }
 
-            // --- FIRMAS ---
+            // ==========================================
+            // 3. FIRMAS
+            // ==========================================
+            
+            // Verificar espacio disponible para firmas
             if (doc.y > 600) doc.addPage();
             
-            const yFirmas = doc.y + 50;
+            const yFirmas = doc.y + 60; // Un poco más de aire antes de las firmas
 
-            // Firma 1
-            doc.text('_____________________________', 50, yFirmas);
-            doc.font('Helvetica-Bold').text('RESPONSABLE PESV', 50, yFirmas + 15);
+            // Firma 1 (Izquierda)
+            doc.text('_____________________________', startX, yFirmas);
+            doc.font(fontBold).text('LÍDER DEL PESV', startX, yFirmas + 15);
             
-            // Firma 2 (Si detectamos un nombre en los campos)
-            const campoNombre = configuracion.camposLlenos.find(c => c.label.toLowerCase().includes('nombre') || c.label.toLowerCase().includes('presidente'));
+            // Firma 2 (Derecha - si aplica)
+            const campoNombre = configuracion.camposLlenos.find(c => c.label.toLowerCase().includes('nombre') || c.label.toLowerCase().includes('responsable'));
             
             if (campoNombre) {
-                doc.text('_____________________________', 350, yFirmas);
-                doc.font('Helvetica-Bold').text(campoNombre.valor.toUpperCase(), 350, yFirmas + 15);
-                doc.font('Helvetica').text('Aceptante', 350, yFirmas + 30);
+                const firmaDerechaX = 350;
+                doc.text('_____________________________', firmaDerechaX, yFirmas);
+                doc.font(fontBold).text(campoNombre.valor.toUpperCase(), firmaDerechaX, yFirmas + 15);
+                doc.font(fontReg).text('Firma Responsable', firmaDerechaX, yFirmas + 30);
             }
 
-            // --- PIE DE PÁGINA ---
-            const pageCount = doc.bufferedPageRange().count;
-            for (let i = 0; i < pageCount; i++) {
+            // ==========================================
+            // 4. NUMERACIÓN DE PÁGINAS (PIE)
+            // ==========================================
+            const range = doc.bufferedPageRange();
+            for (let i = 0; i < range.count; i++) {
                 doc.switchToPage(i);
-                doc.fontSize(8).text(`Página ${i + 1}`, 50, 750, { align: 'center', color: 'gray' });
+                doc.fontSize(8).fillColor('#6c757d')
+                   .text(`Página ${i + 1} de ${range.count}`, 0, 730, { align: 'center', width: 612 }); // Centrado en página (612pt)
             }
 
             doc.end();
@@ -5762,11 +5941,12 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Header.css';
 import { useNavigate } from 'react-router-dom';
 import logo from "../assets/logo-empaquetados.png";
+import { BsList } from 'react-icons/bs'; // Icono de hamburguesa
 
 // Importamos el componente de Campana
 import NotificationBell from './NotificationBell'; 
 
-const Header = () => {
+const Header = ({ onToggleSidebar }) => { // Recibimos la función del Layout
     const { usuario, logout } = useAuth();
     const navigate = useNavigate();
 
@@ -5775,31 +5955,47 @@ const Header = () => {
         navigate('/login');
     };
 
+    // Verificamos si es Colaborador
+    const esColaborador = usuario?.rol === 'Colaborador';
+
     return (
         <header className="header-container">
             
-            {/* --- LOGO RECUPERADO --- */}
-            {/* Se usa la clase 'sidebar-logo-img3' que ya tienes en Header.css con posición absoluta */}
-            <img src={logo} alt="Logo Empaquetados El Trece" className="sidebar-logo-img3"/>
+            {/* --- BOTÓN HAMBURGUESA (Visible solo en Móvil/Tablet) --- */}
+            {/* Solo se muestra si NO es colaborador (porque el colaborador no tiene sidebar) */}
+            {!esColaborador && (
+                <button className="header-toggle-btn" onClick={onToggleSidebar}>
+                    <BsList />
+                </button>
+            )}
 
-            {/* Placeholder izquierdo */}
+            {/* --- LOGO (SOLO VISIBLE PARA COLABORADOR) --- */}
+            {esColaborador && (
+                <img 
+                    src={logo} 
+                    alt="Logo Empaquetados El Trece" 
+                    className="sidebar-logo-img3"
+                />
+            )}
+
+            {/* Placeholder flexible para empujar el contenido a la derecha */}
             <div className="header-title-placeholder"></div>
-            
+       
             {/* --- Sección Derecha: Usuario y Notificaciones --- */}
             <div className="header-user-info">
                 
                 {/* 1. CAMPANA DE NOTIFICACIONES */}
                 <NotificationBell />
                 
-                {/* Separador vertical sutil */}
-                <div style={{width:'1px', height:'25px', background:'#dee2e6', margin:'0 1rem'}}></div>
+                {/* Separador vertical */}
+                <div className="header-separator"></div>
 
                 {/* 2. Información del Usuario */}
-                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: '0.8rem'}}>
-                    <span style={{fontSize: '0.9rem', fontWeight: '600', color: '#333'}}>
+                <div className="user-details">
+                    <span className="user-name">
                         {usuario ? usuario.nombre : 'Usuario'}
                     </span>
-                    <span style={{fontSize: '0.75rem', color: '#6c757d'}}>
+                    <span className="user-role">
                         {usuario ? usuario.rol : ''}
                     </span>
                 </div>
@@ -5810,7 +6006,8 @@ const Header = () => {
                 
                 {/* 3. Botón Cerrar Sesión */}
                 <button onClick={handleLogout} className="header-logout-button">
-                    Cerrar Sesión
+                    <span className="logout-text">Cerrar Sesión</span>
+                    <span className="logout-icon">⏻</span>
                 </button>
             </div>
         </header>
@@ -6280,13 +6477,21 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../services/apiService';
 import '../style/Modal.css';
 import Swal from 'sweetalert2';
-import { BsPlusCircle, BsTrash, BsFileEarmarkText } from 'react-icons/bs';
+import { BsPlusCircle, BsTrash, BsCardHeading, BsTextParagraph } from 'react-icons/bs';
 
 const ModalConfigurarPlantilla = ({ paso, alCerrar }) => {
+    
     const [config, setConfig] = useState({
+        // Datos del Encabezado
+        codigo: '',
+        version: '',
+        fechaEmision: '',
+        fechaRevision: '',
+        
+        // Datos del Contenido
         titulo: '',
         cuerpo: '',
-        campos: [] // [{ label: 'Nombre', tipo: 'texto', orden: 1 }]
+        campos: [] 
     });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -6298,11 +6503,28 @@ const ModalConfigurarPlantilla = ({ paso, alCerrar }) => {
         try {
             const data = await apiFetch(`/pesv/plantilla/${paso.ID_Paso}`);
             if (data.existe) {
+                // Parseamos fechas para el input date (YYYY-MM-DD)
+                const fEmision = data.config.FechaEmision ? data.config.FechaEmision.split('T')[0] : '';
+                const fRevision = data.config.FechaRevision ? data.config.FechaRevision.split('T')[0] : '';
+
                 setConfig({
                     titulo: data.config.TituloDocumento,
                     cuerpo: data.config.CuerpoInicial || '',
+                    codigo: data.config.CodigoDocumento || '',
+                    version: data.config.Version || '',
+                    fechaEmision: fEmision,
+                    fechaRevision: fRevision,
                     campos: data.campos.map(c => ({ label: c.Etiqueta, tipo: c.TipoInput, orden: c.Orden }))
                 });
+            } else {
+                // Valores por defecto sugeridos
+                setConfig(prev => ({
+                    ...prev,
+                    codigo: `PESV-FTO-${paso.NumeroPaso}`,
+                    version: '1',
+                    fechaEmision: new Date().toISOString().split('T')[0],
+                    fechaRevision: new Date().toISOString().split('T')[0]
+                }));
             }
         } catch (error) { console.error(error); }
     };
@@ -6328,7 +6550,7 @@ const ModalConfigurarPlantilla = ({ paso, alCerrar }) => {
     const handleGuardar = async (e) => {
         e.preventDefault();
         if (config.campos.length === 0) {
-            Swal.fire('Atención', 'Debe agregar al menos un campo para el formulario.', 'warning');
+            Swal.fire('Atención', 'Debe agregar al menos un campo dinámico para el formulario.', 'warning');
             return;
         }
         setIsLoading(true);
@@ -6337,12 +6559,10 @@ const ModalConfigurarPlantilla = ({ paso, alCerrar }) => {
                 method: 'POST',
                 body: JSON.stringify({
                     idPaso: paso.ID_Paso,
-                    titulo: config.titulo,
-                    cuerpo: config.cuerpo,
-                    campos: config.campos
+                    ...config // Enviamos todo: codigo, version, fechas, titulo, cuerpo, campos
                 })
             });
-            Swal.fire('Éxito', 'Plantilla configurada correctamente. Ahora se puede generar.', 'success');
+            Swal.fire('Éxito', 'Diseño guardado correctamente.', 'success');
             alCerrar();
         // eslint-disable-next-line no-unused-vars
         } catch (error) {
@@ -6362,29 +6582,63 @@ const ModalConfigurarPlantilla = ({ paso, alCerrar }) => {
                 <form onSubmit={handleGuardar}>
                     <div className="modal-body" style={{maxHeight:'70vh', overflowY:'auto'}}>
                         
+                        {/* SECCIÓN 1: ENCABEZADO DE CONTROL */}
+                        <div style={{backgroundColor:'#f0f7ff', padding:'15px', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid #cce5ff'}}>
+                            <h4 style={{marginTop:0, color:'#005A5B', fontSize:'1rem', display:'flex', alignItems:'center', gap:'8px'}}>
+                                <BsCardHeading /> Datos del Encabezado (Control Documental)
+                            </h4>
+                            <div style={{display:'flex', gap:'10px', marginBottom:'10px'}}>
+                                <div className="form-group" style={{flex:1, marginBottom:0}}>
+                                    <label style={{fontSize:'0.85rem'}}>Código Doc</label>
+                                    <input className="form-control" required value={config.codigo} onChange={e => setConfig({...config, codigo: e.target.value})} placeholder="PESV-FTO-001" />
+                                </div>
+                                <div className="form-group" style={{flex:1, marginBottom:0}}>
+                                    <label style={{fontSize:'0.85rem'}}>Versión</label>
+                                    <input className="form-control" required value={config.version} onChange={e => setConfig({...config, version: e.target.value})} placeholder="1" />
+                                </div>
+                            </div>
+                            <div style={{display:'flex', gap:'10px'}}>
+                                <div className="form-group" style={{flex:1, marginBottom:0}}>
+                                    <label style={{fontSize:'0.85rem'}}>Fecha Emisión</label>
+                                    <input type="date" className="form-control" required value={config.fechaEmision} onChange={e => setConfig({...config, fechaEmision: e.target.value})} />
+                                </div>
+                                <div className="form-group" style={{flex:1, marginBottom:0}}>
+                                    <label style={{fontSize:'0.85rem'}}>Fecha Revisión</label>
+                                    <input type="date" className="form-control" required value={config.fechaRevision} onChange={e => setConfig({...config, fechaRevision: e.target.value})} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SECCIÓN 2: CONTENIDO */}
+                        <h4 style={{marginTop:0, color:'#005A5B', fontSize:'1rem', display:'flex', alignItems:'center', gap:'8px'}}>
+                            <BsTextParagraph /> Contenido del Documento
+                        </h4>
+                        
                         <div className="form-group">
-                            <label>Título del Documento PDF</label>
-                            <input className="form-control" required value={config.titulo} onChange={e => setConfig({...config, titulo: e.target.value})} placeholder="Ej: ACTA DE REUNIÓN" />
+                            <label>Título del Documento (Aparece bajo el nombre del PESV)</label>
+                            <input className="form-control" required value={config.titulo} onChange={e => setConfig({...config, titulo: e.target.value})} placeholder="Ej: ACTA DE CAPACITACIÓN EN SEGURIDAD VIAL" />
                         </div>
                         
                         <div className="form-group">
-                            <label>Texto Introductorio (Fijo)</label>
-                            <textarea className="form-control" rows="3" value={config.cuerpo} onChange={e => setConfig({...config, cuerpo: e.target.value})} placeholder="Ej: En la ciudad de Medellín se reunieron..." />
+                            <label>Texto Introductorio (Párrafo fijo antes de los campos)</label>
+                            <textarea className="form-control" rows="3" value={config.cuerpo} onChange={e => setConfig({...config, cuerpo: e.target.value})} placeholder="Ej: En la ciudad de Medellín, siendo el día..." />
                         </div>
 
                         <hr />
+                        
+                        {/* SECCIÓN 3: CAMPOS */}
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                            <h4 style={{margin:0, color:'#005A5B'}}>Campos Dinámicos</h4>
+                            <h4 style={{margin:0, color:'#005A5B'}}>Campos Dinámicos (Formulario)</h4>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={agregarCampo}>
                                 <BsPlusCircle /> Agregar Campo
                             </button>
                         </div>
                         
-                        {config.campos.length === 0 && <p style={{color:'#999', textAlign:'center'}}>No hay campos definidos. Agrega uno.</p>}
+                        {config.campos.length === 0 && <p style={{color:'#999', textAlign:'center', fontStyle:'italic'}}>Agrega campos para que el usuario diligencie.</p>}
 
                         {config.campos.map((campo, idx) => (
-                            <div key={idx} style={{display:'flex', gap:'10px', marginBottom:'10px', alignItems:'center', backgroundColor:'#f8f9fa', padding:'10px', borderRadius:'6px'}}>
-                                <span style={{fontWeight:'bold', color:'#666'}}>{idx + 1}.</span>
+                            <div key={idx} style={{display:'flex', gap:'10px', marginBottom:'10px', alignItems:'center', backgroundColor:'#f8f9fa', padding:'10px', borderRadius:'6px', border:'1px solid #eee'}}>
+                                <span style={{fontWeight:'bold', color:'#666', width:'20px'}}>{idx + 1}.</span>
                                 <input 
                                     className="form-control" 
                                     placeholder="Nombre del Campo (Ej: Nombre Asistente)" 
@@ -8834,26 +9088,43 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../services/apiService';
 import '../style/Modal.css';
 import Swal from 'sweetalert2';
-import { BsCheckCircle, BsDownload, BsEye, BsXCircle, BsFileText } from 'react-icons/bs';
+import { BsCheckCircle, BsDownload, BsEye, BsFileText, BsCardHeading } from 'react-icons/bs';
 
 const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
-    const [plantilla, setPlantilla] = useState(null); // Aquí guardamos la estructura
-    const [respuestas, setRespuestas] = useState({}); // Aquí lo que escribe el usuario
+    const [plantilla, setPlantilla] = useState(null); 
+    const [respuestas, setRespuestas] = useState({}); 
+    
+    // --- NUEVO: Estado para datos del encabezado ---
+    const [headerData, setHeaderData] = useState({
+        codigo: '',
+        version: '',
+        fechaEmision: '',
+        fechaRevision: ''
+    });
+
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [pdfGenerado, setPdfGenerado] = useState(null); 
 
     const API_URL = 'http://localhost:5000'; 
 
-    // 1. AL ABRIR, CARGAMOS LA PLANTILLA DE LA BD
     useEffect(() => {
         const cargarPlantilla = async () => {
             try {
                 const data = await apiFetch(`/pesv/plantilla/${paso.ID_Paso}`);
                 if (data.existe) {
                     setPlantilla(data);
+                    
+                    // Pre-llenar con lo que está configurado en BD
+                    setHeaderData({
+                        codigo: data.config.CodigoDocumento || `PESV-FTO-${paso.NumeroPaso}`,
+                        version: data.config.Version || '1',
+                        fechaEmision: data.config.FechaEmision ? data.config.FechaEmision.split('T')[0] : new Date().toISOString().split('T')[0],
+                        fechaRevision: data.config.FechaRevision ? data.config.FechaRevision.split('T')[0] : new Date().toISOString().split('T')[0]
+                    });
+
                 } else {
-                    setPlantilla(null); // No hay plantilla para este paso
+                    setPlantilla(null); 
                 }
             } catch (error) {
                 console.error(error);
@@ -8869,6 +9140,11 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
         setRespuestas({ ...respuestas, [label]: valor });
     };
 
+    // Manejador para los campos del encabezado
+    const handleHeaderChange = (e) => {
+        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
+    };
+
     const handleGenerar = async (e) => {
         e.preventDefault();
         setIsGenerating(true);
@@ -8877,7 +9153,8 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                 method: 'POST',
                 body: JSON.stringify({
                     idPaso: paso.ID_Paso,
-                    datosFormulario: respuestas // Enviamos el objeto dinámico { "Nombre": "Juan", ... }
+                    datosFormulario: respuestas,
+                    headerData: headerData // Enviamos los datos editados del encabezado
                 })
             });
             
@@ -8891,8 +9168,7 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                 showConfirmButton: false
             });
             
-            if (alExito) alExito(); 
-
+            if (alExito) alExito();
         } catch (error) {
             Swal.fire('Error', error.message, 'error');
         } finally {
@@ -8900,7 +9176,6 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
         }
     };
 
-    // --- RENDERIZADO DINÁMICO ---
     const renderFormulario = () => {
         if (isLoading) return <p>Cargando estructura...</p>;
         
@@ -8909,13 +9184,40 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                 <div style={{textAlign:'center', padding:'2rem', color:'#666', backgroundColor:'#f8f9fa', borderRadius:'8px'}}>
                     <BsFileText style={{fontSize:'2rem', marginBottom:'10px', opacity:0.5}}/>
                     <p>Este paso aún no tiene una plantilla automática configurada.</p>
-                    <p style={{fontSize:'0.85rem'}}>Por favor, use el botón "Gestionar" para subir el archivo manualmente.</p>
+                    <p style={{fontSize:'0.85rem'}}>Por favor, contacte al Administrador para configurar el formato.</p>
                 </div>
             );
         }
 
         return (
             <form onSubmit={handleGenerar}>
+                
+                {/* --- SECCIÓN DE ENCABEZADO EDITABLE --- */}
+                <div style={{backgroundColor: '#f0f7ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cce5ff'}}>
+                    <h4 style={{marginTop: 0, fontSize: '0.9rem', color: '#005A5B', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                        <BsCardHeading /> Información del Documento
+                    </h4>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Código:</label>
+                            <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleHeaderChange} required />
+                        </div>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Versión:</label>
+                            <input className="form-control" name="version" value={headerData.version} onChange={handleHeaderChange} required />
+                        </div>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Fecha Emisión:</label>
+                            <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleHeaderChange} required />
+                        </div>
+                        <div className="form-group" style={{marginBottom: 0}}>
+                            <label style={{fontSize: '0.8rem'}}>Fecha Revisión:</label>
+                            <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleHeaderChange} required />
+                        </div>
+                    </div>
+                </div>
+                
+                {/* --- HEADER VISUAL --- */}
                 <div className="form-header-box">
                     <BsFileText />
                     <div>
@@ -8924,7 +9226,7 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
                     </div>
                 </div>
 
-                {/* DIBUJAR INPUTS SEGÚN LA BD */}
+                {/* --- CAMPOS DINÁMICOS --- */}
                 {plantilla.campos.map((campo) => (
                     <div key={campo.ID_Campo} className="form-group">
                         <label>{campo.Etiqueta}</label>
@@ -8961,12 +9263,12 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
             <div className="modal-content modal-lg" style={{maxWidth: '650px'}} onClick={e => e.stopPropagation()}>
                 
                 <div className="modal-header">
-                    <h3>{pdfGenerado ? 'Documento Listo' : `Paso ${paso.NumeroPaso}: Generar Documento`}</h3>
+                    <h3>{pdfGenerado ? 'Documento Listo' : `Generar: Paso ${paso.NumeroPaso}`}</h3>
                     <button onClick={alCerrar} className="modal-close-button">&times;</button>
                 </div>
                 
                 {!pdfGenerado ? (
-                    <div className="modal-body">
+                    <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
                         {renderFormulario()}
                     </div>
                 ) : (
@@ -8994,6 +9296,113 @@ const ModalGenerarDocumento = ({ paso, alCerrar, alExito }) => {
 };
 
 export default ModalGenerarDocumento;
+
+
+==================================================================
+ARCHIVO: frontend\src\components\ModalGenerarPdfMedico.jsx
+==================================================================
+// frontend/src/components/ModalGenerarPdfMedico.jsx
+
+import React, { useState } from 'react';
+import { generarPdfExamen } from '../services/medicalService';
+import '../style/Modal.css';
+import { BsFileEarmarkPdfFill, BsCardHeading } from 'react-icons/bs';
+import Swal from 'sweetalert2';
+
+const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
+    
+    // Valores por defecto
+    const [headerData, setHeaderData] = useState({
+        codigo: 'SST-FTO-001',
+        version: '1',
+        fechaEmision: new Date().toISOString().split('T')[0],
+        fechaRevision: new Date().toISOString().split('T')[0]
+    });
+
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleChange = (e) => {
+        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
+    };
+
+    const handleGenerar = async (e) => {
+        e.preventDefault();
+        setIsGenerating(true);
+        try {
+            await generarPdfExamen(examen.ID_ExamenMedico, examen.CedulaColaborador, headerData);
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'PDF Descargado',
+                text: 'El archivo se ha generado con el encabezado configurado.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            alCerrar(); // Cerramos el modal al terminar
+        } catch (error) {
+            Swal.fire('Error', error.message, 'error');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={alCerrar}>
+            <div className="modal-content" style={{maxWidth:'500px'}} onClick={e => e.stopPropagation()}>
+                
+                <div className="modal-header">
+                    <h3>Generar PDF de Recomendaciones</h3>
+                    <button onClick={alCerrar} className="modal-close-button">&times;</button>
+                </div>
+
+                <form onSubmit={handleGenerar}>
+                    <div className="modal-body">
+                        
+                        <div style={{backgroundColor: '#e7f3ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #b6d4fe'}}>
+                            <div style={{fontSize:'0.9rem', marginBottom:'10px', color:'#005A5B', display:'flex', alignItems:'center', gap:'8px'}}>
+                                <BsCardHeading size={20} />
+                                <strong>Configurar Encabezado del Documento</strong>
+                            </div>
+                            
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem'}}>Código</label>
+                                    <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleChange} required />
+                                </div>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem'}}>Versión</label>
+                                    <input className="form-control" name="version" value={headerData.version} onChange={handleChange} required />
+                                </div>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem'}}>Fecha Emisión</label>
+                                    <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleChange} required />
+                                </div>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem'}}>Fecha Revisión</label>
+                                    <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleChange} required />
+                                </div>
+                            </div>
+                        </div>
+
+                        <p style={{fontSize:'0.9rem', color:'#666'}}>
+                            Se generará el acta para: <strong>{examen.NombreColaborador}</strong>
+                        </p>
+
+                    </div>
+
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={alCerrar} disabled={isGenerating}>Cancelar</button>
+                        <button type="submit" className="btn btn-primary" disabled={isGenerating}>
+                            <BsFileEarmarkPdfFill /> {isGenerating ? 'Generando...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default ModalGenerarPdfMedico;
 
 
 ==================================================================
@@ -12877,6 +13286,68 @@ body, #root {
 }
 
 
+
+/* ... (Todo el código anterior) ... */
+
+/* ==========================================================================
+   11. MEJORAS RESPONSIVE PARA CONTENIDO INTERNO
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    /* 1. Ajustar fuentes generales */
+    html {
+        font-size: 14px; /* Reduce ligeramente el tamaño base */
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem; /* Títulos más pequeños */
+    }
+
+    /* 2. Tablas: Ajustes para scroll y legibilidad */
+    .data-table th, .data-table td {
+        padding: 0.75rem 0.5rem; /* Menos relleno en celdas */
+        font-size: 0.85rem;
+    }
+    
+    /* Forzar scroll suave en tablas */
+    .table-wrapper {
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1rem;
+    }
+
+    /* 3. Botones de acción en tablas */
+    .action-buttons {
+        flex-direction: row; /* Mantener en fila si caben */
+        flex-wrap: wrap; /* Permitir bajar si no caben */
+        gap: 5px;
+    }
+    .action-buttons .btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+    }
+
+    /* 4. Ajustes para tarjetas de Dashboard */
+    .dashboard-lists-grid {
+        grid-template-columns: 1fr !important; /* Forzar una sola columna */
+    }
+    
+    .kpi-grid {
+        grid-template-columns: 1fr 1fr; /* 2 columnas en tablets/móviles grandes */
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    /* En celulares muy pequeños, KPIs en una sola columna */
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Ocultar columnas menos importantes en tablas si fuera necesario, 
+       o confiar en el scroll horizontal (que ya tienes configurado). */
+}
+
+
 ==================================================================
 ARCHIVO: frontend\src\layout\ColaboradorLayout.jsx
 ==================================================================
@@ -12909,30 +13380,46 @@ ARCHIVO: frontend\src\layout\MainLayout.jsx
 ==================================================================
 // frontend/src/layout/MainLayout.jsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from '../components/Sidebar'; // Importamos el Sidebar real
-import Header from '../components/Header';   // Importamos el Header real
-import '../style/MainLayout.css'; // Importamos el CSS del layout
+import Sidebar from '../components/Sidebar'; 
+import Header from '../components/Header';   
+import '../style/MainLayout.css'; 
 
 /**
  * @component MainLayout
- * @desc El layout principal de la aplicación autenticada.
+ * @desc El layout principal que gestiona la apertura del menú en móvil.
  */
 const MainLayout = () => {
+    // Estado para controlar si el sidebar está abierto en móvil
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    const closeSidebar = () => {
+        setIsSidebarOpen(false);
+    };
+
     return (
         <div className="app-layout">
             
-            {/* --- 1. Barra Lateral Fija --- */}
-            <Sidebar />
+            {/* --- 1. Barra Lateral (Recibe estado y función de cerrar) --- */}
+            <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+
+            {/* --- Overlay Oscuro (Solo visible en móvil cuando el menú está abierto) --- */}
+            {isSidebarOpen && (
+                <div className="sidebar-overlay" onClick={closeSidebar}></div>
+            )}
 
             {/* --- 2. Contenedor Principal (derecha) --- */}
             <div className="main-content-wrapper">
                 
-                {/* --- Barra Superior --- */}
-                <Header />
+                {/* --- Barra Superior (Recibe la función para ABRIR el menú) --- */}
+                <Header onToggleSidebar={toggleSidebar} />
                 
-                {/* 'Outlet' renderizará la página actual (ej. Dashboard) */}
+                {/* 'Outlet' renderizará la página actual */}
                 <main className="page-content">
                     <Outlet />
                 </main>
@@ -13178,28 +13665,106 @@ ARCHIVO: frontend\src\pages\ActasPage.jsx
 ==================================================================
 // frontend/src/pages/ActasPage.jsx
 
-import React, { useState, useEffect } from 'react';
-import { getActas } from '../services/committeeService';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { getActas, actualizarArchivoActa } from '../services/committeeService';
 import ModalCrearActa from '../components/ModalCrearActa';
 import '../index.css';
-import { BsPlusLg, BsFileEarmarkPdf } from 'react-icons/bs';
+import Swal from 'sweetalert2';
+// Importamos los iconos necesarios
+import { BsPlusLg, BsFileEarmarkPdf, BsSearch, BsCloudUpload, BsDownload, BsEye } from 'react-icons/bs';
 
 const ActasPage = () => {
     const [actas, setActas] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Filtro
+    const [busqueda, setBusqueda] = useState('');
+
+    // Lógica para actualizar archivo
+    const fileInputRef = useRef(null);
+    const [actaParaActualizar, setActaParaActualizar] = useState(null);
+
+    const API_URL = 'http://localhost:5000';
 
     const cargarActas = async () => {
+        setIsLoading(true);
         try {
             const data = await getActas();
             setActas(data);
         } catch (error) {
             console.error(error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     useEffect(() => { cargarActas(); }, []);
 
-    const API_URL = 'http://localhost:5000';
+    // --- FILTRO DE BÚSQUEDA ---
+    const actasFiltradas = useMemo(() => {
+        return actas.filter(acta => {
+            const texto = busqueda.toLowerCase();
+            return (
+                acta.NumeroActa.toLowerCase().includes(texto) ||
+                acta.Lugar.toLowerCase().includes(texto) ||
+                acta.Objetivo.toLowerCase().includes(texto)
+            );
+        });
+    }, [actas, busqueda]);
+
+    // --- MANEJADORES DE DESCARGA ---
+    const handleDescargar = (ruta) => {
+        // Crea un link temporal para forzar descarga
+        const link = document.createElement('a');
+        link.href = `${API_URL}/${ruta.replace(/\\/g, '/')}`;
+        link.setAttribute('download', ''); // Atributo para indicar descarga
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // --- MANEJADORES DE ACTUALIZACIÓN DE ARCHIVO ---
+    const handleClicActualizar = (acta) => {
+        setActaParaActualizar(acta);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ""; // Limpiar input
+            fileInputRef.current.click(); // Abrir selector
+        }
+    };
+
+    const handleArchivoSeleccionado = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !actaParaActualizar) return;
+
+        // Confirmación
+        const result = await Swal.fire({
+            title: '¿Reemplazar Acta?',
+            text: `Se actualizará el archivo del Acta N° ${actaParaActualizar.NumeroActa}.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#007BFF',
+            confirmButtonText: 'Sí, subir nuevo',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const formData = new FormData();
+                formData.append('archivo', file);
+
+                await actualizarArchivoActa(actaParaActualizar.ID_Acta, formData);
+                
+                Swal.fire('Actualizado', 'El archivo del acta se ha actualizado correctamente.', 'success');
+                cargarActas();
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Error', error.message, 'error');
+            }
+        }
+        setActaParaActualizar(null);
+    };
 
     return (
         <div className="page-container">
@@ -13210,36 +13775,99 @@ const ActasPage = () => {
                 </button>
             </div>
 
+            {/* --- INPUT OCULTO PARA SUBIDA --- */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{display:'none'}} 
+                accept=".pdf" 
+                onChange={handleArchivoSeleccionado} 
+            />
+
+            {/* --- BARRA DE FILTROS --- */}
+            <div className="filters-bar" style={{marginBottom: '1.5rem'}}>
+                <div className="search-input-container" style={{maxWidth: '400px', position: 'relative'}}>
+                    <BsSearch style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
+                    <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Buscar por N° Acta, Lugar u Objetivo..." 
+                        style={{ paddingLeft: '40px', height: '45px', borderRadius: '50px' }}
+                        value={busqueda}
+                        onChange={(e) => setBusqueda(e.target.value)}
+                    />
+                </div>
+            </div>
+
             <div className="page-content-card">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>N° Acta</th>
-                            <th>Fecha Reunión</th>
-                            <th>Lugar</th>
-                            <th>Objetivo</th>
-                            <th>Archivo</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {actas.map(acta => (
-                            <tr key={acta.ID_Acta}>
-                                <td><strong>{acta.NumeroActa}</strong></td>
-                                <td>{new Date(acta.FechaReunion).toLocaleDateString()}</td>
-                                <td>{acta.Lugar}</td>
-                                <td>{acta.Objetivo.substring(0, 50)}...</td>
-                                <td>
-                                    {acta.RutaArchivo && (
-                                        <a href={`${API_URL}/${acta.RutaArchivo.replace(/\\/g, '/')}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">
-                                            <BsFileEarmarkPdf /> Ver PDF
-                                        </a>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {actas.length === 0 && <tr><td colSpan="5" style={{textAlign:'center'}}>No hay actas registradas.</td></tr>}
-                    </tbody>
-                </table>
+                <div className="table-wrapper">
+                    {isLoading ? <p>Cargando actas...</p> : (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>N° Acta</th>
+                                    <th>Fecha Reunión</th>
+                                    <th>Lugar</th>
+                                    <th>Objetivo</th>
+                                    <th style={{textAlign: 'center'}}>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {actasFiltradas.length === 0 ? (
+                                    <tr><td colSpan="5" style={{textAlign:'center', padding:'2rem', color:'#999'}}>No se encontraron actas.</td></tr>
+                                ) : (
+                                    actasFiltradas.map(acta => (
+                                        <tr key={acta.ID_Acta}>
+                                            <td><strong>{acta.NumeroActa}</strong></td>
+                                            <td>{new Date(acta.FechaReunion).toLocaleDateString()}</td>
+                                            <td>{acta.Lugar}</td>
+                                            <td title={acta.Objetivo}>{acta.Objetivo.substring(0, 50)}...</td>
+                                            
+                                            <td style={{textAlign: 'center'}}>
+                                                {acta.RutaArchivo ? (
+                                                    <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
+                                                        
+                                                        {/* BOTÓN VER (OJO) */}
+                                                        <a 
+                                                            href={`${API_URL}/${acta.RutaArchivo.replace(/\\/g, '/')}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            className="btn btn-sm btn-secondary"
+                                                            title="Ver en navegador"
+                                                        >
+                                                            <BsEye />
+                                                        </a>
+
+                                                        {/* BOTÓN DESCARGAR */}
+                                                        <button 
+                                                            className="btn btn-sm btn-secondary"
+                                                            onClick={() => handleDescargar(acta.RutaArchivo)}
+                                                            title="Descargar archivo"
+                                                        >
+                                                            <BsDownload />
+                                                        </button>
+
+                                                        {/* BOTÓN ACTUALIZAR (SUBIR NUEVO) */}
+                                                        <button 
+                                                            className="btn btn-sm btn-warning"
+                                                            onClick={() => handleClicActualizar(acta)}
+                                                            title="Actualizar PDF (Ej: Firmado)"
+                                                        >
+                                                            <BsCloudUpload />
+                                                        </button>
+
+                                                    </div>
+                                                ) : (
+                                                    <span style={{color:'#999', fontSize:'0.8rem'}}>Sin archivo</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
             </div>
 
             {modalOpen && <ModalCrearActa alCerrar={() => setModalOpen(false)} alExito={() => { setModalOpen(false); cargarActas(); }} />}
@@ -16232,232 +16860,114 @@ export default LogsPage;
 ==================================================================
 ARCHIVO: frontend\src\pages\MedicinaLaboralPage.jsx
 ==================================================================
-// frontend/src/pages/MedicinaLaboralPage.jsx
+// frontend/src/components/ModalGenerarPdfMedico.jsx
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { getHistorialExamenes, generarPdfExamen } from '../services/medicalService';
-import { BsPlusLg, BsFileEarmarkPdfFill, BsSearch } from 'react-icons/bs';
-import '../index.css'; 
+import React, { useState } from 'react';
+import { generarPdfExamen } from '../services/medicalService';
+import '../style/Modal.css';
+import { BsFileEarmarkPdfFill, BsCardHeading, BsCalendarEvent, BsHash } from 'react-icons/bs';
+import Swal from 'sweetalert2';
 
-import ModalRegistrarExamen from '../components/ModalRegistrarExamen';
-import ModalVerExamen from '../components/ModalVerExamen'; 
-
-const MedicinaLaboralPage = () => {
-    // --- Estados ---
-    const [historial, setHistorial] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [isDownloading, setIsDownloading] = useState(null); 
+const ModalGenerarPdfMedico = ({ examen, alCerrar }) => {
     
-    // --- Filtros (NUEVO) ---
-    const [busqueda, setBusqueda] = useState('');
-    const [filtroConcepto, setFiltroConcepto] = useState('');
+    // Valores por defecto del encabezado
+    const [headerData, setHeaderData] = useState({
+        codigo: 'SST-FTO-001',
+        version: '1',
+        fechaEmision: new Date().toISOString().split('T')[0],
+        fechaRevision: new Date().toISOString().split('T')[0]
+    });
 
-    // --- Estados de Modales ---
-    const [modalRegistroAbierto, setModalRegistroAbierto] = useState(false);
-    const [modalVerAbierto, setModalVerAbierto] = useState(false); 
-    const [examenSeleccionadoId, setExamenSeleccionadoId] = useState(null); 
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    // --- Carga Inicial del Historial ---
-    const cargarHistorial = async () => {
-        try {
-            setIsLoading(true);
-            const data = await getHistorialExamenes();
-            setHistorial(data);
-            setError(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
+    const handleChange = (e) => {
+        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
     };
 
-    useEffect(() => {
-        cargarHistorial();
-    }, []); 
-
-    // --- LÓGICA DE FILTRADO (NUEVA) ---
-    const historialFiltrado = useMemo(() => {
-        return historial.filter(examen => {
-            const texto = busqueda.toLowerCase();
+    const handleGenerar = async (e) => {
+        e.preventDefault();
+        setIsGenerating(true);
+        try {
+            // Llamamos al servicio enviando el ID, Cédula y los datos del Encabezado
+            await generarPdfExamen(examen.ID_ExamenMedico, examen.CedulaColaborador, headerData);
             
-            // 1. Búsqueda por Nombre, Cédula o Tipo de Examen
-            const matchTexto = 
-                examen.NombreColaborador.toLowerCase().includes(texto) ||
-                examen.CedulaColaborador.includes(texto) ||
-                examen.TipoExamen.toLowerCase().includes(texto);
-
-            // 2. Filtro por Concepto
-            const matchConcepto = filtroConcepto ? examen.ConceptoAptitud === filtroConcepto : true;
-
-            return matchTexto && matchConcepto;
-        });
-    }, [historial, busqueda, filtroConcepto]);
-
-    // --- Manejadores ---
-    const handleExamenRegistrado = () => {
-        setModalRegistroAbierto(false); 
-        cargarHistorial(); 
-    };
-    
-    const abrirModalVer = (id) => {
-        setExamenSeleccionadoId(id);
-        setModalVerAbierto(true);
-    };
-    const cerrarModalVer = () => {
-        setModalVerAbierto(false);
-        setExamenSeleccionadoId(null);
-    };
-
-    const handleGenerarPDF = async (examen) => {
-        setIsDownloading(examen.ID_ExamenMedico);
-        try {
-            await generarPdfExamen(examen.ID_ExamenMedico, examen.CedulaColaborador);
-        } catch (err) {
-            console.error(err);
-            alert(`Error al generar el PDF: ${err.message}`);
+            Swal.fire({
+                icon: 'success',
+                title: 'PDF Descargado',
+                text: 'El documento se ha generado correctamente.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            alCerrar();
+        } catch (error) {
+            Swal.fire('Error', error.message, 'error');
         } finally {
-            setIsDownloading(null);
+            setIsGenerating(false);
         }
-    };
-
-    const formatearFecha = (fechaISO) => {
-        if (!fechaISO) return 'N/A';
-        const fecha = new Date(fechaISO.split('T')[0] + 'T00:00:00');
-        return fecha.toLocaleDateString('es-CO');
-    };
-    
-    const getConceptoClass = (concepto) => {
-        if (concepto === 'Apto') return 'status-activo'; 
-        if (concepto === 'Apto con restricciones') return 'status-pendiente'; 
-        if (concepto === 'No Apto') return 'status-inactivo'; 
-        return '';
     };
 
     return (
-        <div className="page-container">
-            {/* --- Encabezado --- */}
-            <div className="page-header">
-                <h1>Medicina Laboral - Exámenes</h1>
-                <button 
-                    className="btn btn-primary"
-                    onClick={() => setModalRegistroAbierto(true)}
-                >
-                    <BsPlusLg /> Registrar Examen
-                </button>
-            </div>
-
-            {/* --- BARRA DE FILTROS (NUEVA) --- */}
-            <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                {/* Input Búsqueda */}
-                <div className="search-input-container" style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
-                    <BsSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Buscar por nombre, cédula o tipo..." 
-                        style={{ paddingLeft: '35px', height: '40px' }}
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
-                    />
-                </div>
-
-                {/* Select Concepto */}
-                <div className="filter-select-container" style={{ minWidth: '220px' }}>
-                    <select 
-                        className="form-control"
-                        style={{ height: '40px' }}
-                        value={filtroConcepto}
-                        onChange={(e) => setFiltroConcepto(e.target.value)}
-                    >
-                        <option value="">Todos los Conceptos</option>
-                        <option value="Apto">Apto</option>
-                        <option value="Apto con restricciones">Apto con restricciones</option>
-                        <option value="No Apto">No Apto</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* --- Tarjeta de Contenido (Tabla) --- */}
-            <div className="page-content-card">
-                <h2>Historial de Exámenes Registrados</h2>
+        <div className="modal-overlay" onClick={alCerrar}>
+            <div className="modal-content" style={{maxWidth:'500px'}} onClick={e => e.stopPropagation()}>
                 
-                <div className="table-wrapper">
-                    {isLoading && <p>Cargando historial...</p>}
-                    {error && <p className="error-message">Error: {error}</p>}
-                    
-                    {!isLoading && !error && (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Colaborador</th>
-                                    <th>Cédula</th>
-                                    <th>Tipo de Examen</th>
-                                    <th>Fecha Examen</th>
-                                    <th>Concepto Aptitud</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {historialFiltrado.length === 0 ? (
-                                    <tr><td colSpan="6" style={{ textAlign: 'center' }}>No se encontraron exámenes.</td></tr>
-                                ) : (
-                                    historialFiltrado.map((examen) => (
-                                        <tr key={examen.ID_ExamenMedico}>
-                                            <td>{examen.NombreColaborador}</td>
-                                            <td>{examen.CedulaColaborador}</td>
-                                            <td>{examen.TipoExamen}</td>
-                                            <td>{formatearFecha(examen.FechaExamen)}</td>
-                                            <td>
-                                                <span className={`status-pill ${getConceptoClass(examen.ConceptoAptitud)}`}>
-                                                    {examen.ConceptoAptitud}
-                                                </span>
-                                            </td>
-                                            <td className="action-buttons">
-                                                <button 
-                                                    className="btn btn-secondary"
-                                                    onClick={() => abrirModalVer(examen.ID_ExamenMedico)}
-                                                >
-                                                    Ver Detalle
-                                                </button>
-                                                <button 
-                                                    className="btn btn-icon"
-                                                    title="Generar Carta de Recomendaciones"
-                                                    onClick={() => handleGenerarPDF(examen)}
-                                                    disabled={isDownloading === examen.ID_ExamenMedico}
-                                                >
-                                                    <BsFileEarmarkPdfFill />
-                                                    {isDownloading === examen.ID_ExamenMedico ? '...' : 'PDF'}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    )}
+                <div className="modal-header">
+                    <h3>Generar PDF de Recomendaciones</h3>
+                    <button onClick={alCerrar} className="modal-close-button">&times;</button>
                 </div>
+
+                <form onSubmit={handleGenerar}>
+                    <div className="modal-body">
+                        
+                        <p style={{fontSize:'0.9rem', color:'#666', marginBottom: '1rem'}}>
+                            Vas a generar el documento para: <strong style={{color:'#005A5B'}}>{examen.NombreColaborador}</strong>
+                        </p>
+
+                        {/* --- SECCIÓN DE ENCABEZADO (La que no te aparecía) --- */}
+                        <div style={{backgroundColor: '#f0f7ff', padding: '15px', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cce5ff'}}>
+                            <div style={{fontSize:'0.9rem', marginBottom:'15px', color:'#005A5B', display:'flex', alignItems:'center', gap:'8px', borderBottom:'1px solid #cce5ff', paddingBottom:'5px'}}>
+                                <BsCardHeading size={18} />
+                                <strong>Configuración del Encabezado</strong>
+                            </div>
+                            
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px'}}>
+                                {/* Código */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Código Doc</label>
+                                    <input className="form-control" name="codigo" value={headerData.codigo} onChange={handleChange} required />
+                                </div>
+                                {/* Versión */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsHash/> Versión</label>
+                                    <input className="form-control" name="version" value={headerData.version} onChange={handleChange} required />
+                                </div>
+                                {/* Fecha Emisión */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Emisión</label>
+                                    <input type="date" className="form-control" name="fechaEmision" value={headerData.fechaEmision} onChange={handleChange} required />
+                                </div>
+                                {/* Fecha Revisión */}
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{fontSize:'0.8rem', display:'flex', gap:'5px', alignItems:'center'}}><BsCalendarEvent/> F. Revisión</label>
+                                    <input type="date" className="form-control" name="fechaRevision" value={headerData.fechaRevision} onChange={handleChange} required />
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={alCerrar} disabled={isGenerating}>Cancelar</button>
+                        <button type="submit" className="btn btn-primary" disabled={isGenerating}>
+                            <BsFileEarmarkPdfFill /> {isGenerating ? 'Generando...' : 'Descargar PDF'}
+                        </button>
+                    </div>
+                </form>
             </div>
-            
-            {/* --- Renderizado de Modales --- */}
-            {modalRegistroAbierto && (
-                <ModalRegistrarExamen
-                    alCerrar={() => setModalRegistroAbierto(false)}
-                    alExito={handleExamenRegistrado}
-                />
-            )}
-            
-            {modalVerAbierto && (
-                <ModalVerExamen
-                    examenId={examenSeleccionadoId}
-                    alCerrar={cerrarModalVer}
-                />
-            )}
         </div>
     );
 };
 
-export default MedicinaLaboralPage;
+export default ModalGenerarPdfMedico;
 
 
 ==================================================================
@@ -18898,7 +19408,7 @@ export const crearActa = async (formData) => {
     const response = await fetch('http://localhost:5000/api/actas', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
-        body: formData // Enviamos FormData porque puede llevar archivo
+        body: formData 
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.msg || 'Error al guardar');
@@ -18907,6 +19417,20 @@ export const crearActa = async (formData) => {
 
 export const getActas = async () => {
     return apiFetch('/actas');
+};
+
+// --- NUEVA FUNCIÓN ---
+export const actualizarArchivoActa = async (idActa, formData) => {
+    const token = localStorage.getItem('token');
+    // PUT /api/actas/:id/archivo
+    const response = await fetch(`http://localhost:5000/api/actas/${idActa}/archivo`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData 
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.msg || 'Error al actualizar archivo');
+    return data;
 };
 
 
@@ -19225,43 +19749,40 @@ ARCHIVO: frontend\src\services\medicalService.js
 
 import { apiFetch } from './apiService.js';
 
-/**
- * @service getHistorialExamenes
- * @desc Obtiene la lista de todos los exámenes médicos registrados
- */
 export const getHistorialExamenes = async () => {
-    return apiFetch('/medicina'); // GET /api/medicina
+    return apiFetch('/medicina'); 
 };
 
-/**
- * @service registrarExamen
- * @desc Registra un nuevo examen médico (RF-029)
- * @param {object} datosExamen
- */
 export const registrarExamen = async (datosExamen) => {
     return apiFetch('/medicina', {
         method: 'POST',
         body: JSON.stringify(datosExamen),
-    }); // POST /api/medicina
+    }); 
+};
+
+export const getExamenMedicoDetalle = async (idExamenMedico) => {
+    return apiFetch(`/medicina/${idExamenMedico}`); 
 };
 
 /**
  * @service generarPdfExamen
- * @desc Descarga el PDF de recomendaciones (RF-030)
- * @param {number} idExamenMedico
- * @param {string} cedulaColaborador - Para el nombre del archivo
+ * @desc Genera y descarga el PDF enviando los datos del encabezado
  */
-export const generarPdfExamen = async (idExamenMedico, cedulaColaborador) => {
+export const generarPdfExamen = async (idExamenMedico, cedulaColaborador, headerData) => {
     const token = localStorage.getItem('token');
+    
+    // Usamos POST para enviar el JSON con los datos del encabezado
     const response = await fetch(`http://localhost:5000/api/medicina/${idExamenMedico}/pdf`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
+        method: 'POST',
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(headerData)
     });
 
     if (!response.ok) {
-        try { const errData = await response.json(); throw new Error(errData.msg || 'No se pudo generar el PDF');} 
-        // eslint-disable-next-line no-unused-vars
-        catch (e) { throw new Error(`Error ${response.status}: No se pudo generar el PDF.`); }
+        throw new Error(`Error ${response.status}: No se pudo generar el PDF.`);
     }
     
     const blob = await response.blob();
@@ -19273,16 +19794,6 @@ export const generarPdfExamen = async (idExamenMedico, cedulaColaborador) => {
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
-};
-
-/**
- * @service getExamenMedicoDetalle
- * @desc Obtiene el detalle completo de UN examen (para el modal)
- * @param {number} idExamenMedico
- */
-export const getExamenMedicoDetalle = async (idExamenMedico) => {
-    // Esta es la función que faltaba exportar
-    return apiFetch(`/medicina/${idExamenMedico}`); // GET /api/medicina/:id
 };
 
 
@@ -20045,45 +20556,98 @@ ARCHIVO: frontend\src\style\Header.css
 
 .header-container {
     display: flex;
-    justify-content: flex-end; /* Alinea todo a la derecha */
+    justify-content: flex-end; /* Alinea todo a la derecha por defecto */
     align-items: center;
     padding: 1rem 2rem;
-    height: 70px; /* Altura fija del header */
+    height: 70px;
     background-color: #FFFFFF;
-    border-bottom: 1px solid #dee2e6; /* Borde sutil */
+    border-bottom: 1px solid #dee2e6;
+    position: relative; /* Necesario para elementos absolutos hijos */
+    gap: 1rem; /* Espacio entre el botón menú y el resto */
 }
 
+/* --- BOTÓN DE MENÚ (HAMBURGUESA) --- */
+.header-toggle-btn {
+    display: none; /* Oculto por defecto en Desktop */
+    background: transparent;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--color-primario); /* Verde corporativo */
+    cursor: pointer;
+    padding: 5px;
+    margin-right: auto; /* Empuja el resto a la derecha en flexbox */
+}
+
+/* Placeholder para empujar contenido */
+.header-title-placeholder {
+    flex-grow: 1;
+}
+
+/* --- LOGO --- */
+.sidebar-logo-img3 {
+    width: 160px;
+    height: auto; 
+    position: absolute;
+    left: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+/* --- SECCIÓN DERECHA --- */
 .header-user-info {
     display: flex;
     align-items: center;
-    color: #6c757d; /* Gris para "Bienvenido" */
+    color: #6c757d;
 }
 
-.header-user-info .user-name {
-    margin: 0 0.5rem 0 0.25rem;
-    color: #212529; /* Texto oscuro */
+/* Separador Vertical */
+.header-separator {
+    width: 1px;
+    height: 25px;
+    background: #dee2e6;
+    margin: 0 1rem;
+}
+
+/* Detalles de Texto (Nombre y Rol) */
+.user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-right: 0.8rem;
+    text-align: right;
+}
+
+.user-name {
+    font-size: 0.9rem;
     font-weight: 600;
+    color: #333;
 }
 
-.header-user-info .user-avatar {
+.user-role {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Avatar Circular */
+.user-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #007BFF; /* Color acento */
+    background-color: #007BFF;
     color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
     font-size: 1.2rem;
-    margin-left: 0.5rem;
+    flex-shrink: 0; /* No encoger */
 }
 
-
-
+/* Botón Logout */
 .header-logout-button {
     background: transparent;
-    border: 1px solid #dc3545; /* Rojo */
+    border: 1px solid #dc3545;
     color: #dc3545;
     padding: 0.4rem 0.8rem;
     margin-left: 1.5rem;
@@ -20092,26 +20656,82 @@ ARCHIVO: frontend\src\style\Header.css
     font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
+
 .header-logout-button:hover {
     background-color: #dc3545;
     color: white;
 }
 
-.sidebar-logo-img3 {
-    width: 160px; /* Ancho que especificaste */
-    height: auto; 
-    margin-top: -2rem;
-    position: absolute;
-    left: 2%;
-    /* CORRECCIÓN: Espacio mínimo entre logo y texto */
-    margin-bottom: -2.5rem; /* Pega el texto al logo */
+.logout-icon {
+    display: none; /* Oculto en desktop */
+    font-size: 1.2rem;
+    line-height: 1;
 }
 
-.nombreEmpresa{
-    position: absolute;
-    left: 13%;
-    /* color: #000; */
+/* =========================================
+   RESPONSIVE DESIGN (Móviles y Tablets)
+   ========================================= */
+@media (max-width: 992px) { /* Coincide con el breakpoint del Sidebar */
+    .header-container {
+        padding: 0.5rem 1rem;
+        height: 60px;
+        justify-content: space-between; 
+    }
+
+    /* Mostrar el botón de hamburguesa en Tablet/Móvil */
+    .header-toggle-btn {
+        display: block; 
+    }
+
+    /* 1. Logo en Móvil: Más pequeño y estático */
+    .sidebar-logo-img3 {
+        position: static; 
+        transform: none;
+        width: 100px;
+        margin: 0;
+        display: block;
+    }
+
+    /* Ocultar placeholder */
+    .header-title-placeholder {
+        display: none;
+    }
+
+    /* 2. Ajustar espacio de elementos derechos */
+    .header-user-info {
+        gap: 0.5rem;
+    }
+
+    /* 3. Ocultar Separador y Texto de Nombre en pantallas muy chicas */
+    .header-separator,
+    .user-details {
+        display: none; 
+    }
+
+    /* 4. Ajustar Botón de Logout */
+    .header-logout-button {
+        margin-left: 0.5rem;
+        padding: 0.3rem 0.6rem;
+        border: none; 
+    }
+    
+    .header-logout-button .logout-text {
+        display: none; 
+    }
+    .logout-icon {
+        display: block; 
+    }
+    
+    /* 5. Avatar un poco más pequeño */
+    .user-avatar {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
 }
 
 
@@ -20844,6 +21464,69 @@ ARCHIVO: frontend\src\style\Modal.css
     color: #6c757d;
 }
 
+/* ... (Mantén todo el código anterior hasta .modal-footer) ... */
+
+/* AGREGAR AL FINAL DEL ARCHIVO: */
+
+/* =========================================
+   RESPONSIVE MODALES
+   ========================================= */
+
+@media (max-width: 768px) {
+    /* 1. Caja del Modal: Más ancha y alta en móvil */
+    .modal-content, 
+    .modal-content.modal-lg {
+        width: 95% !important;
+        max-width: 95% !important;
+        max-height: 90vh !important; /* Evitar que se salga de la pantalla */
+        padding: 1.2rem !important; /* Menos relleno interno */
+        margin: 0 auto;
+    }
+
+    /* 2. Encabezado */
+    .modal-header h2, 
+    .modal-header h3 {
+        font-size: 1.2rem; /* Título más pequeño */
+    }
+
+    /* 3. Formularios: FORZAR COLUMNA ÚNICA */
+    /* Este truco hace que los divs con display: flex dentro del modal se vuelvan columna */
+    .modal-body div[style*="display: flex"], 
+    .modal-body div[style*="display:flex"] {
+        flex-direction: column !important;
+        gap: 1rem !important;
+    }
+    
+    /* Excepción: Los radio buttons o checkboxes pequeños no deben apilarse */
+    .modal-body div[style*="display: flex"] label,
+    .modal-body div[style*="display:flex"] label {
+        margin-bottom: 0;
+    }
+    
+    /* Excepción: Las listas de evidencias o filas pequeñas */
+    .evidence-item {
+        flex-direction: row !important; /* Mantener icono y texto lado a lado */
+    }
+
+    /* 4. Inputs y Selects */
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: 16px; /* Evita zoom automático en iPhone al escribir */
+        padding: 0.7rem;
+    }
+
+    /* 5. Footer (Botones) */
+    .modal-footer {
+        flex-direction: column-reverse; /* Botón principal arriba, cancelar abajo */
+        gap: 0.8rem;
+    }
+    .modal-footer button {
+        width: 100%; /* Botones ancho completo */
+        padding: 0.9rem;
+    }
+}
+
 
 ==================================================================
 ARCHIVO: frontend\src\style\PlanificacionPage.css
@@ -20994,6 +21677,50 @@ ARCHIVO: frontend\src\style\ReportarPage.css
     background-color: #e6f7ec;
     padding: 1rem;
     border-radius: 8px;
+}
+
+
+/* ... (Código anterior) ... */
+
+/* AGREGAR AL FINAL: */
+
+@media (max-width: 768px) {
+    /* Contenedor del calendario */
+    .calendar-card {
+        padding: 0.5rem; /* Menos padding */
+    }
+
+    /* Altura del calendario */
+    .rbc-calendar {
+        height: 500px !important; /* Un poco menos alto */
+        font-size: 0.75rem !important; /* Letra más pequeña */
+    }
+
+    /* Cabecera del calendario (Días) */
+    .rbc-header {
+        padding: 2px 0 !important;
+        font-size: 0.7rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Botones de la barra de herramientas del calendario */
+    .rbc-toolbar button {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Título del calendario (Mes/Año) */
+    .rbc-toolbar-label {
+        font-size: 1rem;
+        font-weight: bold;
+    }
+    
+    /* Selector de Cronograma */
+    .cronograma-selector select {
+        width: 100%;
+        min-width: 0; /* Permitir que encoja */
+    }
 }
 
 

@@ -117,6 +117,17 @@ const PlanificacionPage = () => {
         });
     }, [actividades, busqueda, filtroEstado]);
 
+    // --- NUEVO: Cálculo de Totales para la Leyenda ---
+    const totales = useMemo(() => {
+        return {
+            pendientes: actividades.filter(a => a.EstadoActividad === 'Pendiente').length,
+            realizadas: actividades.filter(a => a.EstadoActividad === 'Realizada').length,
+            canceladas: actividades.filter(a => a.EstadoActividad === 'Cancelada').length,
+            acpmAbiertas: acpms.filter(a => a.EstadoACPM !== 'Cerrada').length,
+            acpmCerradas: acpms.filter(a => a.EstadoACPM === 'Cerrada').length
+        };
+    }, [actividades, acpms]);
+
     // --- Calendario ---
     const calendarEvents = useMemo(() => {
         // 1. Actividades
@@ -129,10 +140,9 @@ const PlanificacionPage = () => {
             resource: act 
         }));
 
-        // 2. ACPMs (CORREGIDO: Muestra TODAS y usa FechaCierre si aplica)
+        // 2. ACPMs
         const eventosACPM = acpms.map(acpm => {
             const isCerrada = acpm.EstadoACPM === 'Cerrada';
-            // Si está cerrada, usamos FechaCierre. Si no, FechaLimite.
             const fechaEvento = isCerrada && acpm.FechaCierre ? acpm.FechaCierre : acpm.FechaLimite;
             
             return {
@@ -169,7 +179,6 @@ const PlanificacionPage = () => {
         let backgroundColor = '#3174ad'; 
         
         if (event.tipo === 'ACPM') {
-            // Gris para cerrada, Naranja para abierta/proceso
             backgroundColor = event.resource.EstadoACPM === 'Cerrada' ? '#6c757d' : '#fd7e14';
         } else {
             if (event.resource.EstadoActividad === 'Realizada') backgroundColor = '#28a745'; 
@@ -268,14 +277,31 @@ const PlanificacionPage = () => {
 
             {/* --- CALENDARIO INTEGRADO (PRIMERO) --- */}
             <div className="page-content-card calendar-card" style={{marginBottom: '2rem'}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-                    <h2>Calendario General</h2>
-                    <div style={{display: 'flex', gap: '1rem', fontSize: '0.9rem'}}>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#3174ad', borderRadius: '50%'}}></span> Pendiente</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#28a745', borderRadius: '50%'}}></span> Realizada</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#dc3545', borderRadius: '50%'}}></span> Cancelada</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#fd7e14', borderRadius: '50%'}}></span> ACPM (Abierta)</span>
-                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><span style={{width: 10, height: 10, background: '#6c757d', borderRadius: '50%'}}></span> ACPM (Cerrada)</span>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap:'wrap', gap:'10px'}}>
+                    <h2 style={{margin:0}}>Calendario General</h2>
+                    
+                    {/* --- LEYENDA CON CONTADORES --- */}
+                    <div style={{display: 'flex', gap: '1rem', fontSize: '0.9rem', flexWrap:'wrap'}}>
+                        <span title="Actividades Pendientes" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#3174ad', borderRadius: '50%'}}></span> 
+                            Pendientes <strong>({totales.pendientes})</strong>
+                        </span>
+                        <span title="Actividades Realizadas" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#28a745', borderRadius: '50%'}}></span> 
+                            Realizadas <strong>({totales.realizadas})</strong>
+                        </span>
+                        <span title="Actividades Canceladas" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#dc3545', borderRadius: '50%'}}></span> 
+                            Canceladas <strong>({totales.canceladas})</strong>
+                        </span>
+                        <span title="ACPM en curso" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#fd7e14', borderRadius: '50%'}}></span> 
+                            ACPM (Abierta) <strong>({totales.acpmAbiertas})</strong>
+                        </span>
+                        <span title="ACPM Cerradas" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                            <span style={{width: 10, height: 10, background: '#6c757d', borderRadius: '50%'}}></span> 
+                            ACPM (Cerrada) <strong>({totales.acpmCerradas})</strong>
+                        </span>
                     </div>
                 </div>
                 
@@ -300,7 +326,7 @@ const PlanificacionPage = () => {
                 )}
             </div>
 
-            {/* --- BARRA DE FILTROS (EN EL MEDIO) --- */}
+            {/* --- BARRA DE FILTROS --- */}
             <div className="filters-bar" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <div className="search-input-container" style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
                     <BsSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
@@ -316,7 +342,7 @@ const PlanificacionPage = () => {
                 </div>
             </div>
 
-            {/* --- TABLA DE ACTIVIDADES (SEGUNDO - ABAJO) --- */}
+            {/* --- TABLA DE ACTIVIDADES --- */}
             <div className="page-content-card">
                 <h2>Listado de Actividades</h2>
                 <div className="table-wrapper">
@@ -362,7 +388,6 @@ const PlanificacionPage = () => {
                                         </td>
 
                                         <td className="action-buttons">
-                                            {/* BOTÓN VER DETALLE */}
                                             <button 
                                                 className="btn btn-secondary" 
                                                 onClick={() => abrirModalDetalle(act)} 
@@ -371,7 +396,6 @@ const PlanificacionPage = () => {
                                                 <BsInfoCircle /> Ver Detalle
                                             </button>
 
-                                            {/* BOTONES DE GESTIÓN (Solo si NO es Realizada ni Cancelada) */}
                                             {act.EstadoActividad !== 'Realizada' && act.EstadoActividad !== 'Cancelada' && (
                                                 <>
                                                     <button className="btn btn-secondary" onClick={() => abrirModalGestionar(act)} title="Cambiar Estado">Gestionar</button>
