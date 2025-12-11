@@ -29,7 +29,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         <aside className={containerClass}>
             <div className="sidebar-logo">
                 <img src={logo} alt="Logo" className="sidebar-logo-img"/>
-                <h3>SG-SST App</h3>
+                <h3>SG-SST</h3>
                 <button className="sidebar-close-btn" onClick={onClose}>&times;</button>
             </div>
 
@@ -67,6 +67,22 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <NavLink to="/historial" className="sidebar-link" onClick={onClose}>
                             <BsClockHistory /> Historial y Trazabilidad
                         </NavLink>
+
+                        {/* --- NUEVA SECCIÓN PARA SUPER ADMIN --- */}
+                        <div className="sidebar-section-label">OPERACIÓN SST</div>
+
+                        <NavLink to="/planificacion" className="sidebar-link" onClick={onClose}>
+                            <BsCalendarWeek /> Planificación
+                        </NavLink>
+
+                        <NavLink to="/reportes" className="sidebar-link" onClick={onClose}>
+                            <BsExclamationTriangleFill /> Reportes Colaboradores
+                        </NavLink>
+
+                        <NavLink to="/acpm" className="sidebar-link" onClick={onClose}>
+                            <BsGraphUpArrow /> Acciones (ACPM)
+                        </NavLink>
+                        {/* -------------------------------------- */}
 
                         <div className="sidebar-section-label">APROBACIONES</div>
 
@@ -188,4 +204,4 @@ const Sidebar = ({ isOpen, onClose }) => {
     );
 };
 
-export default Sidebar;
+export default Sidebar; 

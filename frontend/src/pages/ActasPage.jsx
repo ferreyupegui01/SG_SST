@@ -1,24 +1,22 @@
 // frontend/src/pages/ActasPage.jsx
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getActas, actualizarArchivoActa } from '../services/committeeService';
+import { getActas, actualizarArchivoActa, subirFirmasActa, descargarActa } from '../services/committeeService';
 import ModalCrearActa from '../components/ModalCrearActa';
 import '../index.css';
 import Swal from 'sweetalert2';
-// Importamos los iconos necesarios
-import { BsPlusLg, BsFileEarmarkPdf, BsSearch, BsCloudUpload, BsDownload, BsEye } from 'react-icons/bs';
+import { BsPlusLg, BsSearch, BsCloudUpload, BsDownload, BsEye, BsPen } from 'react-icons/bs';
 
 const ActasPage = () => {
     const [actas, setActas] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    
-    // Filtro
     const [busqueda, setBusqueda] = useState('');
 
-    // Lógica para actualizar archivo
+    // Estados para subida de archivos
     const fileInputRef = useRef(null);
-    const [actaParaActualizar, setActaParaActualizar] = useState(null);
+    const [actaSeleccionada, setActaSeleccionada] = useState(null);
+    const [tipoCarga, setTipoCarga] = useState(''); // 'ORIGINAL' o 'FIRMAS'
 
     const API_URL = 'http://localhost:5000';
 
@@ -36,7 +34,6 @@ const ActasPage = () => {
 
     useEffect(() => { cargarActas(); }, []);
 
-    // --- FILTRO DE BÚSQUEDA ---
     const actasFiltradas = useMemo(() => {
         return actas.filter(acta => {
             const texto = busqueda.toLowerCase();
@@ -48,57 +45,80 @@ const ActasPage = () => {
         });
     }, [actas, busqueda]);
 
-    // --- MANEJADORES DE DESCARGA ---
-    const handleDescargar = (ruta) => {
-        // Crea un link temporal para forzar descarga
-        const link = document.createElement('a');
-        link.href = `${API_URL}/${ruta.replace(/\\/g, '/')}`;
-        link.setAttribute('download', ''); // Atributo para indicar descarga
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    // --- DESCARGA DIRECTA (SIN PESTAÑA) ---
+    const handleDescargar = async (idActa, tipo, nombreArchivo) => {
+        try {
+            const blob = await descargarActa(idActa, tipo);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombreArchivo;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        // eslint-disable-next-line no-unused-vars
+        } catch (error) {
+            Swal.fire('Error', 'No se pudo descargar el archivo.', 'error');
+        }
     };
 
-    // --- MANEJADORES DE ACTUALIZACIÓN DE ARCHIVO ---
-    const handleClicActualizar = (acta) => {
-        setActaParaActualizar(acta);
+    // --- VER EN NAVEGADOR ---
+    const handleVer = (ruta) => {
+        if (!ruta) return;
+        window.open(`${API_URL}/${ruta.replace(/\\/g, '/')}`, '_blank');
+    };
+
+    // --- SUBIR ARCHIVO ---
+    const iniciarCarga = (acta, tipo) => {
+        setActaSeleccionada(acta);
+        setTipoCarga(tipo); 
         if (fileInputRef.current) {
-            fileInputRef.current.value = ""; // Limpiar input
-            fileInputRef.current.click(); // Abrir selector
+            fileInputRef.current.value = "";
+            fileInputRef.current.click(); 
         }
     };
 
     const handleArchivoSeleccionado = async (e) => {
         const file = e.target.files[0];
-        if (!file || !actaParaActualizar) return;
+        if (!file || !actaSeleccionada) return;
 
-        // Confirmación
+        const esFirmas = tipoCarga === 'FIRMAS';
+        const titulo = esFirmas ? 'Subir Acta Firmada' : 'Reemplazar Original';
+        const texto = esFirmas 
+            ? `Se agregará el documento de firmas para el Acta ${actaSeleccionada.NumeroActa}.`
+            : `Se sobrescribirá el archivo original del Acta ${actaSeleccionada.NumeroActa}.`;
+
         const result = await Swal.fire({
-            title: '¿Reemplazar Acta?',
-            text: `Se actualizará el archivo del Acta N° ${actaParaActualizar.NumeroActa}.`,
+            title: titulo,
+            text: texto,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#007BFF',
-            confirmButtonText: 'Sí, subir nuevo',
+            confirmButtonText: 'Sí, subir',
             cancelButtonText: 'Cancelar'
         });
 
         if (result.isConfirmed) {
             try {
                 const formData = new FormData();
-                formData.append('archivo', file);
-
-                await actualizarArchivoActa(actaParaActualizar.ID_Acta, formData);
+                if (esFirmas) {
+                    formData.append('archivoFirmas', file);
+                    await subirFirmasActa(actaSeleccionada.ID_Acta, formData);
+                } else {
+                    formData.append('archivo', file);
+                    await actualizarArchivoActa(actaSeleccionada.ID_Acta, formData);
+                }
                 
-                Swal.fire('Actualizado', 'El archivo del acta se ha actualizado correctamente.', 'success');
+                Swal.fire('Éxito', 'Archivo subido correctamente.', 'success');
                 cargarActas();
             } catch (error) {
                 console.error(error);
                 Swal.fire('Error', error.message, 'error');
             }
         }
-        setActaParaActualizar(null);
+        setActaSeleccionada(null);
+        setTipoCarga('');
     };
 
     return (
@@ -110,26 +130,16 @@ const ActasPage = () => {
                 </button>
             </div>
 
-            {/* --- INPUT OCULTO PARA SUBIDA --- */}
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                style={{display:'none'}} 
-                accept=".pdf" 
-                onChange={handleArchivoSeleccionado} 
-            />
+            <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".pdf" onChange={handleArchivoSeleccionado} />
 
-            {/* --- BARRA DE FILTROS --- */}
             <div className="filters-bar" style={{marginBottom: '1.5rem'}}>
                 <div className="search-input-container" style={{maxWidth: '400px', position: 'relative'}}>
                     <BsSearch style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
                     <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Buscar por N° Acta, Lugar u Objetivo..." 
+                        type="text" className="form-control" 
+                        placeholder="Buscar por N° Acta..." 
                         style={{ paddingLeft: '40px', height: '45px', borderRadius: '50px' }}
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
+                        value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
                     />
                 </div>
             </div>
@@ -141,10 +151,10 @@ const ActasPage = () => {
                             <thead>
                                 <tr>
                                     <th>N° Acta</th>
-                                    <th>Fecha Reunión</th>
-                                    <th>Lugar</th>
+                                    <th>Fecha</th>
                                     <th>Objetivo</th>
-                                    <th style={{textAlign: 'center'}}>Acciones</th>
+                                    <th style={{textAlign: 'center', width: '180px'}}>Acta Original</th>
+                                    <th style={{textAlign: 'center', width: '180px'}}>Acta Firmada</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -155,45 +165,53 @@ const ActasPage = () => {
                                         <tr key={acta.ID_Acta}>
                                             <td><strong>{acta.NumeroActa}</strong></td>
                                             <td>{new Date(acta.FechaReunion).toLocaleDateString()}</td>
-                                            <td>{acta.Lugar}</td>
-                                            <td title={acta.Objetivo}>{acta.Objetivo.substring(0, 50)}...</td>
+                                            <td title={acta.Objetivo}>{acta.Objetivo.substring(0, 40)}...</td>
                                             
+                                            {/* COLUMNA 1: ORIGINAL */}
                                             <td style={{textAlign: 'center'}}>
                                                 {acta.RutaArchivo ? (
-                                                    <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
-                                                        
-                                                        {/* BOTÓN VER (OJO) */}
-                                                        <a 
-                                                            href={`${API_URL}/${acta.RutaArchivo.replace(/\\/g, '/')}`} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            className="btn btn-sm btn-secondary"
-                                                            title="Ver en navegador"
-                                                        >
+                                                    <div style={{display:'flex', gap:'5px', justifyContent:'center'}}>
+                                                        <button className="btn btn-sm btn-secondary" onClick={() => handleVer(acta.RutaArchivo)} title="Ver">
                                                             <BsEye />
-                                                        </a>
-
-                                                        {/* BOTÓN DESCARGAR */}
+                                                        </button>
                                                         <button 
-                                                            className="btn btn-sm btn-secondary"
-                                                            onClick={() => handleDescargar(acta.RutaArchivo)}
-                                                            title="Descargar archivo"
+                                                            className="btn btn-sm btn-secondary" 
+                                                            onClick={() => handleDescargar(acta.ID_Acta, 'original', `Acta_${acta.NumeroActa}.pdf`)} 
+                                                            title="Descargar"
                                                         >
                                                             <BsDownload />
                                                         </button>
-
-                                                        {/* BOTÓN ACTUALIZAR (SUBIR NUEVO) */}
-                                                        <button 
-                                                            className="btn btn-sm btn-warning"
-                                                            onClick={() => handleClicActualizar(acta)}
-                                                            title="Actualizar PDF (Ej: Firmado)"
-                                                        >
-                                                            <BsCloudUpload />
+                                                        <button className="btn btn-sm btn-warning" onClick={() => iniciarCarga(acta, 'ORIGINAL')} title="Reemplazar">
+                                                            <BsPen />
                                                         </button>
+                                                    </div>
+                                                ) : <span style={{color:'#999', fontSize:'0.8rem'}}>--</span>}
+                                            </td>
 
+                                            {/* COLUMNA 2: FIRMADA */}
+                                            <td style={{textAlign: 'center'}}>
+                                                {acta.RutaArchivoFirmas ? (
+                                                    <div style={{display:'flex', gap:'5px', justifyContent:'center'}}>
+                                                        <button className="btn btn-sm btn-success" onClick={() => handleVer(acta.RutaArchivoFirmas)} title="Ver Firmado">
+                                                            <BsEye />
+                                                        </button>
+                                                        <button 
+                                                            className="btn btn-sm btn-success" 
+                                                            onClick={() => handleDescargar(acta.ID_Acta, 'firmas', `Acta_Firmada_${acta.NumeroActa}.pdf`)} 
+                                                            title="Descargar Firmado"
+                                                        >
+                                                            <BsDownload />
+                                                        </button>
                                                     </div>
                                                 ) : (
-                                                    <span style={{color:'#999', fontSize:'0.8rem'}}>Sin archivo</span>
+                                                    <button 
+                                                        className="btn btn-sm"
+                                                        style={{border:'1px dashed #007BFF', color:'#007BFF', background:'white'}}
+                                                        onClick={() => iniciarCarga(acta, 'FIRMAS')}
+                                                        title="Subir Firmas"
+                                                    >
+                                                        <BsCloudUpload /> Subir
+                                                    </button>
                                                 )}
                                             </td>
                                         </tr>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
     getCronogramas, 
     getActividadesPorCronograma, 
+    // eslint-disable-next-line no-unused-vars
     eliminarActividad,
     eliminarCronograma 
 } from '../services/scheduleService';
@@ -37,8 +38,12 @@ const messages = { allDay: 'Todo el día', previous: 'Anterior', next: 'Siguient
 
 const parseDateAsLocal = (dateString) => {
     if (!dateString) return null;
+    try { 
+        const datePart = dateString.split('T')[0]; 
+        const [year, month, day] = datePart.split('-'); 
+        return new Date(year, month - 1, day); 
     // eslint-disable-next-line no-unused-vars
-    try { const datePart = dateString.split('T')[0]; const [year, month, day] = datePart.split('-'); return new Date(year, month - 1, day); } catch (e) { return new Date(dateString); }
+    } catch (e) { return new Date(dateString); }
 };
 
 const PlanificacionPage = () => {
@@ -117,7 +122,7 @@ const PlanificacionPage = () => {
         });
     }, [actividades, busqueda, filtroEstado]);
 
-    // --- NUEVO: Cálculo de Totales para la Leyenda ---
+    // --- Cálculo de Totales para la Leyenda ---
     const totales = useMemo(() => {
         return {
             pendientes: actividades.filter(a => a.EstadoActividad === 'Pendiente').length,
@@ -201,7 +206,8 @@ const PlanificacionPage = () => {
     const cerrarModalEvidencia = () => { setModalEvidenciaAbierto(false); setActividadSeleccionada(null); };
     const abrirModalDetalle = (actividad) => { setActividadSeleccionada(actividad); setModalDetalleAbierto(true); };
     const cerrarModalDetalle = () => { setModalDetalleAbierto(false); setActividadSeleccionada(null); };
-    const abrirModalEliminarActividad = (actividad) => { setItemAEliminar({ tipo: 'actividad', data: actividad }); setModalConfirmarAbierto(true); };
+    
+    // Solo dejamos la eliminación de cronogramas
     const abrirModalEliminarCronograma = () => {
         if (!cronogramaSeleccionado) return;
         const crono = cronogramas.find(c => c.ID_Cronograma == cronogramaSeleccionado);
@@ -213,10 +219,7 @@ const PlanificacionPage = () => {
         if (!itemAEliminar) return;
         // eslint-disable-next-line no-useless-catch
         try {
-            if (itemAEliminar.tipo === 'actividad') {
-                await eliminarActividad(itemAEliminar.data.ID_Actividad);
-                refrescarActividades();
-            } else if (itemAEliminar.tipo === 'cronograma') {
+            if (itemAEliminar.tipo === 'cronograma') {
                 await eliminarCronograma(itemAEliminar.data.ID_Cronograma);
                 setCronogramaSeleccionado(null); cargarDatosIniciales(); 
             }
@@ -400,7 +403,7 @@ const PlanificacionPage = () => {
                                                 <>
                                                     <button className="btn btn-secondary" onClick={() => abrirModalGestionar(act)} title="Cambiar Estado">Gestionar</button>
                                                     <button className="btn btn-warning" onClick={() => abrirModalEditar(act)} title="Editar Datos">Editar</button>
-                                                    <button className="btn btn-danger" onClick={() => abrirModalEliminarActividad(act)} title="Eliminar Actividad"><BsTrash /></button>
+                                                    {/* El botón de eliminar actividad se ha retirado */}
                                                 </>
                                             )}
                                         </td>

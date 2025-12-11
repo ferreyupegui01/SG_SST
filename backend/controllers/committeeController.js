@@ -19,17 +19,14 @@ const crearActa = async (req, res) => {
     const archivoSubido = req.file;
 
     try {
-        // 1. Validaciones de Fechas Requeridas
         if (!fechaReunion) {
             return res.status(400).json({ msg: "La 'Fecha de Reunión' es obligatoria." });
         }
 
-        // Parseo seguro de fechas
         const valFechaEmision = fechaEmision ? new Date(fechaEmision) : null;
         const valFechaRevision = fechaRevision ? new Date(fechaRevision) : null;
         const valFechaReunion = new Date(fechaReunion);
 
-        // 2. Parseo de Listas
         let arrAsistentes = [];
         let arrCompromisos = [];
         try {
@@ -40,7 +37,6 @@ const crearActa = async (req, res) => {
         if (!Array.isArray(arrAsistentes)) arrAsistentes = [];
         if (!Array.isArray(arrCompromisos)) arrCompromisos = [];
 
-        // 3. PDF
         let rutaArchivo = '';
         const jsonAsistentesSQL = JSON.stringify(arrAsistentes);
         const jsonCompromisosSQL = JSON.stringify(arrCompromisos);
@@ -65,7 +61,6 @@ const crearActa = async (req, res) => {
             rutaArchivo = rutaRelativa;
         }
 
-        // 4. BD
         const pool = await poolPromise;
         await pool.request()
             .input('CodigoDocumento', mssql.NVarChar, codigoDocumento)
@@ -105,7 +100,6 @@ const getActas = async (req, res) => {
     }
 };
 
-// --- NUEVA FUNCIÓN: ACTUALIZAR ARCHIVO ---
 const actualizarArchivoActa = async (req, res) => {
     const { id } = req.params;
     const archivoNuevo = req.file;
@@ -116,19 +110,79 @@ const actualizarArchivoActa = async (req, res) => {
 
     try {
         const rutaArchivo = archivoNuevo.path.replace(/\\/g, '/');
-
         const pool = await poolPromise;
         await pool.request()
             .input('idActa', mssql.Int, id)
             .input('rutaArchivo', mssql.NVarChar, rutaArchivo)
             .query('EXEC SP_UPDATE_ActaArchivo @idActa, @rutaArchivo');
 
-        res.json({ msg: 'Archivo del acta actualizado correctamente' });
-
+        res.json({ msg: 'Archivo original actualizado correctamente' });
     } catch (error) {
         console.error("❌ Error actualizando archivo acta:", error);
         res.status(500).send('Error al actualizar el archivo');
     }
 };
 
-export default { crearActa, getActas, actualizarArchivoActa };
+// --- NUEVA FUNCIÓN: SUBIR FIRMAS ---
+const subirFirmasActa = async (req, res) => {
+    const { id } = req.params;
+    const archivoFirmas = req.file;
+
+    if (!archivoFirmas) return res.status(400).json({ msg: 'No se ha subido ningún archivo de firmas.' });
+
+    try {
+        const rutaArchivo = archivoFirmas.path.replace(/\\/g, '/');
+        const pool = await poolPromise;
+        await pool.request()
+            .input('idActa', mssql.Int, id)
+            .input('rutaArchivo', mssql.NVarChar, rutaArchivo)
+            .query('EXEC SP_UPLOAD_FirmasActa @idActa, @rutaArchivo');
+
+        res.json({ msg: 'Documento de firmas subido correctamente' });
+    } catch (error) {
+        console.error("❌ Error subiendo firmas:", error);
+        res.status(500).send('Error al subir el archivo de firmas');
+    }
+};
+
+// --- NUEVA FUNCIÓN: DESCARGAR ARCHIVO ---
+const descargarActa = async (req, res) => {
+    const { id } = req.params;
+    const { tipo } = req.query; // 'original' o 'firmas'
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', mssql.Int, id)
+            .query('SELECT RutaArchivo, RutaArchivoFirmas, NumeroActa FROM ComiteActas WHERE ID_Acta = @id');
+
+        if (result.recordset.length === 0) return res.status(404).json({ msg: 'Acta no encontrada' });
+
+        const acta = result.recordset[0];
+        let rutaRelativa = (tipo === 'firmas') ? acta.RutaArchivoFirmas : acta.RutaArchivo;
+
+        if (!rutaRelativa) return res.status(404).json({ msg: 'Archivo no disponible' });
+
+        // Limpiar ruta para evitar problemas de path
+        if (rutaRelativa.startsWith('backend/')) rutaRelativa = rutaRelativa.replace('backend/', '');
+        if (rutaRelativa.startsWith('backend\\')) rutaRelativa = rutaRelativa.replace('backend\\', '');
+
+        const rutaAbsoluta = path.resolve(__dirname, '..', rutaRelativa);
+
+        if (fs.existsSync(rutaAbsoluta)) {
+            const sufijo = tipo === 'firmas' ? '_FIRMADO' : '';
+            const nombreDescarga = `Acta_${acta.NumeroActa}${sufijo}.pdf`;
+            
+            // Forzamos la descarga con el nombre correcto
+            res.download(rutaAbsoluta, nombreDescarga);
+        } else {
+            res.status(404).json({ msg: 'El archivo físico no existe en el servidor.' });
+        }
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error en descarga');
+    }
+};
+
+export default { crearActa, getActas, actualizarArchivoActa, subirFirmasActa, descargarActa };
