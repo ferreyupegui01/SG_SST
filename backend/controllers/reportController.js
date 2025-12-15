@@ -14,14 +14,19 @@ const crearReporteMaquina = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     
-    const { idActivo, estadoReportado, descripcionProblema, datosReporte, kilometraje } = req.body;
+    // --- CAMBIO: Se recibe 'aceptaDeclaracion' del body ---
+    const { idActivo, estadoReportado, descripcionProblema, datosReporte, kilometraje, aceptaDeclaracion } = req.body;
     const idUsuarioReporta = req.usuario.id;
     const archivoFoto = req.file ? req.file.path : null;
 
     try {
         const pool = await poolPromise;
         
-        // 1. Guardar Reporte
+        // Convertir el valor a BIT (1 o 0)
+        // El frontend envía "true" como string en FormData, o true booleano en JSON
+        const bitAceptacion = (aceptaDeclaracion === 'true' || aceptaDeclaracion === true) ? 1 : 0;
+
+        // 1. Guardar Reporte (Se agrega el input aceptaDeclaracion)
         await pool.request()
             .input('idActivo', mssql.Int, idActivo)
             .input('idUsuarioReporta', mssql.Int, idUsuarioReporta)
@@ -30,7 +35,8 @@ const crearReporteMaquina = async (req, res) => {
             .input('rutaFotoAdjunta', mssql.NVarChar, archivoFoto)
             .input('datosReporte', mssql.NVarChar(mssql.MAX), datosReporte || null) 
             .input('kilometraje', mssql.Int, kilometraje || null)
-            .query('EXEC SP_CREATE_ReporteMaquina @idActivo, @idUsuarioReporta, @estadoReportado, @descripcionProblema, @rutaFotoAdjunta, @datosReporte, @kilometraje');
+            .input('aceptaDeclaracion', mssql.Bit, bitAceptacion) // <--- NUEVO INPUT
+            .query('EXEC SP_CREATE_ReporteMaquina @idActivo, @idUsuarioReporta, @estadoReportado, @descripcionProblema, @rutaFotoAdjunta, @datosReporte, @kilometraje, @aceptaDeclaracion');
 
         // 2. Obtener nombre del activo para la notificación
         const activoResult = await pool.request().input('id', mssql.Int, idActivo).query('SELECT NombreDescriptivo FROM ActivosInspeccionables WHERE ID_Activo = @id');
@@ -123,7 +129,6 @@ const getReportesSeguridad = async (req, res) => {
 const getReporteMaquinaDetalle = async (req, res) => {
     const { id: idReporte } = req.params;
     
-    // --- CAMBIO: Se eliminó 'Gestion de Calidad' ---
     const esAdmin = ['Administrador SST', 'Super Admin'].includes(req.usuario.rol);
     const marcarRevisado = esAdmin ? 1 : 0;
 
@@ -151,7 +156,6 @@ const getReporteMaquinaDetalle = async (req, res) => {
 const getReporteSeguridadDetalle = async (req, res) => {
     const { id: idReporte } = req.params;
     
-    // --- CAMBIO: Se eliminó 'Gestion de Calidad' ---
     const esAdmin = ['Administrador SST', 'Super Admin'].includes(req.usuario.rol);
     const marcarRevisado = esAdmin ? 1 : 0;
 

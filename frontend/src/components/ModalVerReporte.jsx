@@ -5,13 +5,21 @@ import { getReporteMaquinaDetalle, getReporteSeguridadDetalle } from '../service
 import '../style/Modal.css';
 import '../index.css'; 
 import '../style/InspeccionesPage.css';
-import { BsSpeedometer2, BsGeoAlt, BsPersonBadge, BsCalendarCheck } from 'react-icons/bs';
+import { 
+    BsSpeedometer2, 
+    BsGeoAlt, 
+    BsPersonBadge, 
+    BsCalendarCheck,
+    BsFileEarmarkCheckFill,   // Nuevo icono
+    BsCheckCircleFill,        // Nuevo icono
+    BsExclamationTriangleFill // Nuevo icono
+} from 'react-icons/bs';
 
 const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
     const [detalle, setDetalle] = useState(reporte);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const API_BASE_URL = 'http://localhost:5000';
+    const API_BASE_URL = 'http://localhost:5000'; // Ajusta si tu puerto es 4000
 
     useEffect(() => {
         const cargarDetalle = async () => {
@@ -27,10 +35,6 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
                 }
             
                 setDetalle(data); 
-                
-                // --- CORRECCIÓN: ELIMINADA LA LLAMADA A alExito() AQUÍ ---
-                // Esto evita que la tabla padre se recargue mientras el modal está abierto,
-                // rompiendo el bucle infinito.
 
             } catch (err) { 
                 setError(err.message); 
@@ -39,7 +43,7 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
             }
         };
         cargarDetalle();
-    }, [reporte, tipo]); // Dependencias limpias
+    }, [reporte, tipo]); 
 
     // Formatear fecha
     const formatearFecha = (fecha) => {
@@ -64,16 +68,16 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
                             {/* === REPORTE DE MÁQUINA === */}
                             {(tipo === 'maquina' || tipo === 'Máquina (Pre-uso)') ? (
                                 <>
-                                    <div style={{display:'flex', gap:'1rem', marginBottom:'1rem', backgroundColor:'#f8f9fa', padding:'1rem', borderRadius:'8px', alignItems:'center'}}>
-                                        <div style={{flex:1}}>
+                                    <div style={{display:'flex', gap:'1rem', marginBottom:'1rem', backgroundColor:'#f8f9fa', padding:'1rem', borderRadius:'8px', alignItems:'center', flexWrap:'wrap'}}>
+                                        <div style={{flex:'1 1 200px'}}>
                                             <strong>Activo:</strong> {detalle.NombreActivo}
                                             <div style={{fontSize:'0.9rem', color:'#666'}}>{detalle.CodigoActivo} {detalle.Marca ? `- ${detalle.Marca}` : ''}</div>
                                         </div>
-                                        <div style={{flex:1}}>
+                                        <div style={{flex:'1 1 200px'}}>
                                             <strong>Reportado por:</strong> {detalle.NombreUsuarioReporta}
                                             <div style={{fontSize:'0.9rem', color:'#666'}}>C.C. {detalle.CedulaUsuarioReporta}</div>
                                         </div>
-                                        <div style={{textAlign:'right'}}>
+                                        <div style={{textAlign:'right', flex:'1 1 auto'}}>
                                             <span className={`status-pill ${detalle.EstadoReportado === 'OK' ? 'status-activo' : 'status-pendiente'}`}>
                                                 {detalle.EstadoReportado}
                                             </span>
@@ -128,6 +132,54 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
                                             <img src={`${API_BASE_URL}/${detalle.RutaFotoAdjunta.replace(/\\/g, '/')}`} alt="Evidencia" style={{ maxWidth: '100%', marginTop:'0.5rem', borderRadius:'8px', border:'1px solid #ddd' }} />
                                         </div>
                                     )}
+
+                                    {/* --- SECCIÓN NUEVA: DECLARACIÓN JURAMENTADA EN MODAL --- */}
+                                    <div style={{ 
+                                        marginTop: '20px',
+                                        border: '1px solid #005A5B', 
+                                        backgroundColor: '#e6f7ec', 
+                                        borderRadius: '8px', 
+                                        padding: '15px',
+                                        textAlign: 'center',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center'
+                                    }}>
+                                        <div style={{fontSize:'1.5rem', color:'#005A5B', marginBottom:'5px'}}>
+                                            <BsFileEarmarkCheckFill />
+                                        </div>
+                                        
+                                        <h4 style={{margin:'0 0 5px 0', color:'#005A5B', fontSize:'1rem'}}>Declaración del Colaborador</h4>
+                                        
+                                        <p style={{fontStyle:'italic', color:'#333', fontSize:'0.8rem', margin:'0 0 10px 0'}}>
+                                            "Declaro que la información es veraz y asumo la responsabilidad."
+                                        </p>
+
+                                        <div style={{
+                                            padding:'5px 15px', 
+                                            borderRadius:'20px', 
+                                            backgroundColor:'#fff', 
+                                            border:'1px solid #28a745', 
+                                            color:'#28a745', 
+                                            fontWeight:'bold', 
+                                            fontSize:'0.85rem',
+                                            display:'flex', 
+                                            alignItems:'center', 
+                                            gap:'5px'
+                                        }}>
+                                            {detalle.AceptaDeclaracion ? (
+                                                <>
+                                                    <BsCheckCircleFill /> CONFIRMADO
+                                                </>
+                                            ) : (
+                                                <span style={{color:'#dc3545', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                    <BsExclamationTriangleFill /> NO REGISTRADO
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* ----------------------------------------------------- */}
+
                                 </>
                             ) : (
                                 /* === REPORTE DE SEGURIDAD === */
@@ -168,4 +220,5 @@ const ModalVerReporte = ({ reporte, tipo, alCerrar }) => {
         </div>
     );
 };
+
 export default ModalVerReporte;

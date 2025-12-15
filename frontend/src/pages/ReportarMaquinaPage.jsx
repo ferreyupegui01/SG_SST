@@ -21,6 +21,9 @@ const ReportarMaquinaPage = () => {
     const [descripcionProblema, setDescripcionProblema] = useState('');
     const [fotoReporte, setFotoReporte] = useState(null); 
     
+    // --- NUEVO ESTADO PARA LA DECLARACIÓN ---
+    const [aceptaDeclaracion, setAceptaDeclaracion] = useState(false);
+
     // Estados de Datos Maestros
     const [listaActivos, setListaActivos] = useState([]);
     const [listaFormularios, setListaFormularios] = useState([]);
@@ -194,6 +197,17 @@ const ReportarMaquinaPage = () => {
             return;
         }
 
+        // --- NUEVA VALIDACIÓN: Declaración obligatoria ---
+        if (!aceptaDeclaracion) {
+            Swal.fire({
+                title: 'Atención',
+                text: 'Debe aceptar la declaración de veracidad para enviar el reporte.',
+                icon: 'warning',
+                confirmButtonColor: '#005A5B'
+            });
+            return;
+        }
+
         setIsLoadingSubmit(true);
         const formData = new FormData();
         formData.append('idActivo', idActivo);
@@ -214,6 +228,9 @@ const ReportarMaquinaPage = () => {
         
         if (fotoReporte) formData.append('fotoReporte', fotoReporte);
 
+        // --- ENVIAR NUEVO CAMPO AL BACKEND ---
+        formData.append('aceptaDeclaracion', aceptaDeclaracion);
+
         try {
             await crearReporteMaquina(formData);
             Swal.fire('Enviado', 'Reporte registrado exitosamente.', 'success');
@@ -229,6 +246,7 @@ const ReportarMaquinaPage = () => {
             setPreguntasActivas([]);
             setDebugInfo(null);
             setActivoInfo(null);
+            setAceptaDeclaracion(false); // Resetear checkbox
             e.target.reset();
         } catch (err) {
             setError(err.message);
@@ -317,7 +335,6 @@ const ReportarMaquinaPage = () => {
                                 <div style={{fontSize:'1rem'}}>{activoInfo.Marca || ''} {activoInfo.Modelo || ''}</div>
                             </div>
                             
-                            {/* --- CORRECCIÓN FINAL (Multiopción) --- */}
                             <div className="form-group" style={{marginBottom:0, gridColumn:'span 2', borderTop:'1px solid #ddd', paddingTop:'10px', marginTop:'5px'}}>
                                 <label style={{fontSize:'0.8rem', fontWeight:'bold', color:'#666', display:'flex', alignItems:'center', gap:'5px'}}>
                                     <BsPersonBadge /> Reportado por:
@@ -325,9 +342,7 @@ const ReportarMaquinaPage = () => {
                                 <div style={{fontSize:'1rem', color: '#005A5B', fontWeight:'bold'}}>
                                     {usuario?.NombreCompleto || usuario?.nombre || usuario?.Nombre}
                                 </div>
-                               
                             </div>
-                            {/* --------------------------------------------------- */}
                         </div>
                     )}
 
@@ -403,7 +418,36 @@ const ReportarMaquinaPage = () => {
                         <input type="file" className="form-control" onChange={handleFileChange} accept="image/*" />
                     </div>
 
-                    <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={isLoadingSubmit}>
+                    {/* --- SECCIÓN DECLARACIÓN JURAMENTADA (NUEVO) --- */}
+                    <div style={{ 
+                        border: '1px solid #005A5B', 
+                        padding: '15px', 
+                        borderRadius: '8px', 
+                        margin: '20px 0',
+                        backgroundColor: '#e6f7ec' 
+                    }}>
+                        <p style={{ fontSize: '0.9rem', marginBottom: '15px', fontWeight: 'bold', color: '#155724', lineHeight: '1.5' }}>
+                            Declaro que la información registrada en este reporte es veraz, correcta y completa, y que refleja fielmente el estado real de la máquina/vehículo al momento del reporte. Asumo la responsabilidad por los datos ingresados.
+                        </p>
+                        
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold', color: '#005A5B', fontSize: '1rem' }}>
+                            <input
+                                type="checkbox"
+                                checked={aceptaDeclaracion}
+                                onChange={(e) => setAceptaDeclaracion(e.target.checked)}
+                                style={{ marginRight: '10px', width: '20px', height: '20px', cursor: 'pointer', accentColor: '#005A5B' }}
+                            />
+                             Acepto y confirmo lo anterior
+                        </label>
+                    </div>
+                    {/* ----------------------------------------------- */}
+
+                    <button 
+                        type="submit" 
+                        className="btn btn-primary" 
+                        style={{width:'100%'}} 
+                        disabled={isLoadingSubmit || !aceptaDeclaracion}
+                    >
                         {isLoadingSubmit ? 'Enviando...' : 'Enviar Reporte'}
                     </button>
                     
